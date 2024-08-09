@@ -78,22 +78,50 @@ class GL:
 
         print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
         print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
-
-
         
-        # Exemplo:
-        for i in range(0, len(lineSegments) - 1, 2): # itera na lista de pontos de 2 em 2 para pegar X e Y de uma vez
-            #tudo com type cast p/ int pois a funcao do GPU.draw_pixel apenas recebe ints
-            pos_x = int(lineSegments[i])
-            pos_y = int(lineSegments[i + 1])
-            r = int(colors["emissiveColor"][0] * 255) #pegamos apenas a cor emissiva, e salvamos cada valor em sua variavel correspondente
-            g = int(colors["emissiveColor"][1] * 255)
-            b = int(colors["emissiveColor"][2] * 255)
-            gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [r, g, b])
+        # Saving the colors in their respective variable, using emissive colors.
+        r = int(colors["emissiveColor"][0] * 255) 
+        g = int(colors["emissiveColor"][1] * 255)
+        b = int(colors["emissiveColor"][2] * 255)
+        
+        for i in range(0, len(lineSegments), 4):
+            x_0 = int(lineSegments[i])
+            y_0 = int(lineSegments[i + 1])
+            x_1 = int(lineSegments[i + 2])
+            y_1 = int(lineSegments[i + 3])
 
-        # pos_x = GL.width//2
-        # pos_y = GL.height//2
-        # gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 255])  # altera pixel (u, v, tipo, r, g, b)
+            #bresenhams algorithm, calc based from: https://rosettacode.org/wiki/Bitmap/Bresenham%27s_line_algorithm
+            dx = abs(x_1 - x_0)
+            dy = abs(y_1 - y_0)
+
+            sx = 1 
+            if x_0 > x_1:
+                sx = -1
+
+            sy = 1
+            if y_0 > y_1:
+                sy = -1
+
+            err = dx - dy
+            steps = max(dx, dy)
+
+            for _ in range(steps + 1):
+                gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
+                if x_0 == x_1 and y_0 == y_1:
+                    break
+                e2 = 2 * err
+                
+                if e2 > -dy:
+                    err -= dy
+                    x_0 += sx
+
+                if e2 < dx:
+                    err += dx
+                    y_0 += sy
+
+        # testes para ajudar no debuggin:
+        # gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
+        # gpu.GPU.draw_pixel([x_1, y_1], gpu.GPU.RGB8, [r, g, b]) # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
 
     @staticmethod
