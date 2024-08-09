@@ -44,13 +44,23 @@ class GL:
         # você pode assumir inicialmente o desenho dos pontos com a cor emissiva (emissiveColor).
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Polypoint2D : pontos = {0}".format(point)) # imprime no terminal pontos
-        print("Polypoint2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("Polypoint2D : pontos = {0}".format(point)) # imprime no terminal pontos
+        # print("Polypoint2D : colors = {0}".format(colors)) # imprime no terminal as cores
+
+        
+        for i in range(0, len(point) - 1, 2): # itera na lista de pontos de 2 em 2 para pegar X e Y de uma vez
+            #tudo com type cast p/ int pois a funcao do GPU.draw_pixel apenas recebe ints
+            pos_x = int(point[i])
+            pos_y = int(point[i + 1])
+            r = int(colors["emissiveColor"][0] * 255) #pegamos apenas a cor emissiva, e salvamos cada valor em sua variavel correspondente
+            g = int(colors["emissiveColor"][1] * 255)
+            b = int(colors["emissiveColor"][2] * 255)
+            gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [r, g, b])
 
         # Exemplo:
-        pos_x = GL.width//2
-        pos_y = GL.height//2
-        gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 0])  # altera pixel (u, v, tipo, r, g, b)
+        # pos_x = GL.width//2
+        # pos_y = GL.height//2
+        # gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 0])  # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
         
     @staticmethod
@@ -68,11 +78,22 @@ class GL:
 
         print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
         print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
+
+
         
         # Exemplo:
-        pos_x = GL.width//2
-        pos_y = GL.height//2
-        gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 255])  # altera pixel (u, v, tipo, r, g, b)
+        for i in range(0, len(lineSegments) - 1, 2): # itera na lista de pontos de 2 em 2 para pegar X e Y de uma vez
+            #tudo com type cast p/ int pois a funcao do GPU.draw_pixel apenas recebe ints
+            pos_x = int(lineSegments[i])
+            pos_y = int(lineSegments[i + 1])
+            r = int(colors["emissiveColor"][0] * 255) #pegamos apenas a cor emissiva, e salvamos cada valor em sua variavel correspondente
+            g = int(colors["emissiveColor"][1] * 255)
+            b = int(colors["emissiveColor"][2] * 255)
+            gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [r, g, b])
+
+        # pos_x = GL.width//2
+        # pos_y = GL.height//2
+        # gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 255])  # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
 
     @staticmethod
