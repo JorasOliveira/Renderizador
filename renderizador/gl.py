@@ -209,15 +209,15 @@ class GL:
 
             for x in range(x_min, x_max + 1):
                 for y in range(y_min, y_max + 1):
-                    l_1 = x * (y_1 - y_0) - y * (x_1 - x_0) + y_0*(x_1 - x_0) - x_0*(y_1 - y_0)
-                    l_2 = x*(y_2 - y_1) - y * (x_2 - x_1) + y_1 * (x_2 - x_1) - x_1 * (y_2 - y_1)
+                    l_1 = x * (y_1 - y_0) - y * (x_1 - x_0) + y_0 * (x_1 - x_0) - x_0 * (y_1 - y_0)
+                    l_2 = x * (y_2 - y_1) - y * (x_2 - x_1) + y_1 * (x_2 - x_1) - x_1 * (y_2 - y_1)
                     l_3 = x * (y_0 - y_2) - y * (x_0 - x_2) + y_2 * (x_0 - x_2) - x_2 * (y_0 - y_2)
 
                     if (l_1 >= 0) and (l_2 >= 0) and (l_3 >= 0):
                         gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
 
         # Exemplo:
-        GL.polypoint2D(vertices, colors)
+        # GL.polypoint2D(vertices, colors)
 
 
     @staticmethod
