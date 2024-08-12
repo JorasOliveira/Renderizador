@@ -94,31 +94,53 @@ class GL:
             dx = abs(x_1 - x_0)
             dy = abs(y_1 - y_0)
 
-            sx = 1 
-            if x_0 > x_1:
-                sx = -1
+            sx = -1 if x_0 > x_1 else 1
+            sy = -1 if y_0 > y_1 else 1
 
-            sy = 1
-            if y_0 > y_1:
-                sy = -1
-
-            err = dx - dy
-            steps = max(dx, dy)
-
-            for _ in range(steps + 1):
-                gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
-                if x_0 == x_1 and y_0 == y_1:
-                    break
-                e2 = 2 * err
-                
-                if e2 > -dy:
+            gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
+    
+            if dx > dy:
+                err = dx / 2.0
+                while (x_0 != x_1):
+                    gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
                     err -= dy
+                    if err < 0:
+                        y_0 += sy 
+                        err += dx 
                     x_0 += sx
-
-                if e2 < dx:
-                    err += dx
+            else:             
+                err = dy / 2.0
+                while (y_0 != y_1):
+                    gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
+                    err -= dx
+                    if err < 0:
+                        x_0 += sx 
+                        err += dy 
                     y_0 += sy
 
+            gpu.GPU.draw_pixel([x_1, y_1], gpu.GPU.RGB8, [r, g, b])
+
+            # tentativa antiga, TODO -> remover
+            # err = dx - dy
+            # steps = max(dx, dy)
+
+            # for _ in range(steps + 1):
+            #     gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
+
+            #     if x_0 == x_1 and y_0 == y_1:
+            #         break
+
+            #     e2 = 2 * err
+                
+            #     if e2 > -dy:
+            #         err -= dy
+            #         x_0 += sx
+
+            #     if e2 < dx:
+            #         err += dx
+            #         y_0 += sy
+        # Exemplo:
+        # GL.polypoint2D(lineSegments, colors)
         # testes para ajudar no debuggin:
         # gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
         # gpu.GPU.draw_pixel([x_1, y_1], gpu.GPU.RGB8, [r, g, b]) # altera pixel (u, v, tipo, r, g, b)
@@ -155,8 +177,47 @@ class GL:
         print("TriangleSet2D : vertices = {0}".format(vertices)) # imprime no terminal
         print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
 
+        # Saving the colors in their respective variable, using emissive colors.
+        r = int(colors["emissiveColor"][0] * 255) 
+        g = int(colors["emissiveColor"][1] * 255)
+        b = int(colors["emissiveColor"][2] * 255)
+
+        for i in range(0, len(vertices), 6):
+            #all vertices are saved as points
+            x_0 = int(vertices[i])
+            y_0 = int(vertices[i + 1])
+            x_1 = int(vertices[i + 2])
+            y_1 = int(vertices[i + 3])
+            x_2 = int(vertices[i + 4])
+            y_2 = int(vertices[i + 5])
+
+            # drawing the lines from vertice to vertice 
+            # points are always ordered in CCW for some reason
+            GL.polyline2D([x_0, y_0, x_1, y_1], colors)
+            GL.polyline2D([x_1, y_1, x_2, y_2], colors)
+            GL.polyline2D([x_2, y_2, x_0, y_0], colors)
+
+            # figuring out if a point is withing a triangle or not
+            # L(x, y) = x(y1 – y0) – y(x1 – x0) + y0(x1 – x0) – x0(y1 – y0)
+            # if (L1 >= 0 && L2 >= 0 && L3 >= 0) p is inside the triangle 
+            # with bounding box optmization
+
+            x_min = min(x_0, x_1, x_2)
+            x_max = max(x_0, x_1, x_2)
+            y_min = min(y_0, y_1, y_2)
+            y_max = max(y_0, y_1, y_2)
+
+            for x in range(x_min, x_max + 1):
+                for y in range(y_min, y_max + 1):
+                    l_1 = x * (y_1 - y_0) - y * (x_1 - x_0) + y_0*(x_1 - x_0) - x_0*(y_1 - y_0)
+                    l_2 = x*(y_2 - y_1) - y * (x_2 - x_1) + y_1 * (x_2 - x_1) - x_1 * (y_2 - y_1)
+                    l_3 = x * (y_0 - y_2) - y * (x_0 - x_2) + y_2 * (x_0 - x_2) - x_2 * (y_0 - y_2)
+
+                    if (l_1 >= 0) and (l_2 >= 0) and (l_3 >= 0):
+                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
+
         # Exemplo:
-        gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
+        GL.polypoint2D(vertices, colors)
 
 
     @staticmethod
