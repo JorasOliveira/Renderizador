@@ -120,25 +120,6 @@ class GL:
 
             gpu.GPU.draw_pixel([x_1, y_1], gpu.GPU.RGB8, [r, g, b])
 
-            # tentativa antiga, TODO -> remover
-            # err = dx - dy
-            # steps = max(dx, dy)
-
-            # for _ in range(steps + 1):
-            #     gpu.GPU.draw_pixel([x_0, y_0], gpu.GPU.RGB8, [r, g, b])
-
-            #     if x_0 == x_1 and y_0 == y_1:
-            #         break
-
-            #     e2 = 2 * err
-                
-            #     if e2 > -dy:
-            #         err -= dy
-            #         x_0 += sx
-
-            #     if e2 < dx:
-            #         err += dx
-            #         y_0 += sy
         # Exemplo:
         # GL.polypoint2D(lineSegments, colors)
         # testes para ajudar no debuggin:
