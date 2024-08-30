@@ -260,6 +260,40 @@ class GL:
             print("rotation = {0} ".format(rotation), end='') # imprime no terminal
         print("")
 
+        #these matrices are easy, they are just diagonal* matrices with the values of the scale, translation and rotation
+        scale_matrix = np.array([
+            [scale[0], 0, 0, 0], 
+            [0, scale[1], 0, 0], 
+            [0, 0, scale[2], 0], 
+            [0, 0, 0, 1]])
+        translation_matrix = np.array([
+            [1, 0, 0, translation[0]], 
+            [0, 1, 0, translation[1]], 
+            [0, 0, 1, translation[2]], 
+            [0, 0, 0, 1]])
+        
+        #this is where the fun begins
+        #calculatin the quarternions for the rotation
+        qi = rotation[0] * math.sin(rotation[3] / 2) 
+        qj = rotation[1] * math.sin(rotation[3] / 2) 
+        qk = rotation[2] * math.sin(rotation[3] / 2)
+        qr = math.cos(rotation[3] / 2)
+
+        #building the rotation matrix
+        rotation_matrix = np.array([
+            [1 - 2*(qj**2 + qk**2), 2*(qi*qj - qk*qr), 2*(qi*qk + qj*qr), 0],
+            [2*(qi*qj + qk*qr), 1 - 2*(qi**2 + qk**2), 2*(qj*qk - qi*qr), 0],
+            [2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
+            [0,0, 0, 1]
+        ]) 
+
+        #multiplying the matrices
+        #the tricky part is the order of operations, because with matrices the order matters
+        #ideally we want to rotate the object around its center, then scale it and finally translate it 
+        transform_matrix = np.dot(translation_matrix, np.dot(rotation_matrix, scale_matrix))
+        # print(transform_matrix)
+
+
     @staticmethod
     def transform_out():
         """Função usada para renderizar (na verdade coletar os dados) de Transform."""
