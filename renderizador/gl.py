@@ -31,6 +31,9 @@ class GL:
         GL.height = height
         GL.near = near
         GL.far = far
+        GL.view_matrix = np.identity(4)
+        GL.projection_matrix = np.identity(4)
+        GL.transform_matrix = np.identity(4)
 
     @staticmethod
     def polypoint2D(point, colors):
@@ -233,6 +236,67 @@ class GL:
         # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
 
+        #orientation and position matrices
+
+        orientation = np.array([
+            [0, 0, orientation[0], 0],
+            [0, orientation[1], 0, 0],
+            [orientation[2], 0, 0, 0],
+            [0, 0, 0, 1]
+        ])
+
+        position = np.array([
+            [1, 0, 0, -position[0]],
+            [0, 1, 0, -position[1]],
+            [0, 0, 1, -position[2]],
+            [0, 0, 0, 1]
+        ])
+
+        GL.view_matrix = np.matmul(orientation, position)
+        print("view matrix: ")
+        print(GL.view_matrix)
+
+        fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / ((GL.height**2) / (GL.width**2))))
+
+        #Projection Matrix:
+        top = GL.near * math.tan(fov_y / 2)
+        right = top * (GL.width / GL.height)
+
+        p = np.array([
+            [(GL.near / right), 0, 0, 0],
+            [0, (GL.near / top), 0, 0],
+            [0, 0, -((GL.far + GL.near) / (GL.far - GL.near)), -((2 * GL.far * GL.near) / (GL.far - GL.near))],
+            [0, 0, -1, 0]
+        ])
+
+        #Mapping the points to the screen
+        scale = np.array([
+            [(GL.width / 2), 0, 0, 1],
+            [0, (GL.height / 2), 0, 1],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ])
+
+        translate = np.array([
+            [1, 0, 0, 1],
+            [0, 1, 0, 1],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ])
+
+        mirroring = np.array([
+            [1, 0, 0, 1],
+            [0, -1, 0, 1],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ])
+
+        #final transformation matrix, I thinkg the order is wrong...
+        GL.projection_matrix = np.matmul(mirroring, np.matmul(translate, scale))
+
+        print("camera transform matrix: ")
+        print(GL.projection_matrix)
+
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Viewpoint : ", end='')
         print("position = {0} ".format(position), end='')
@@ -266,6 +330,7 @@ class GL:
             [0, scale[1], 0, 0], 
             [0, 0, scale[2], 0], 
             [0, 0, 0, 1]])
+        
         translation_matrix = np.array([
             [1, 0, 0, translation[0]], 
             [0, 1, 0, translation[1]], 
@@ -290,8 +355,10 @@ class GL:
         #multiplying the matrices
         #the tricky part is the order of operations, because with matrices the order matters
         #ideally we want to rotate the object around its center, then scale it and finally translate it 
-        transform_matrix = np.dot(translation_matrix, np.dot(rotation_matrix, scale_matrix))
-        # print(transform_matrix)
+        GL.transform_matrix = np.matmul(translation_matrix, np.matmul(rotation_matrix, scale_matrix))
+        print("transform_matrix: ")
+        print(GL.transform_matrix)
+
 
 
     @staticmethod
