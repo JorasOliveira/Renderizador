@@ -224,70 +224,62 @@ class GL:
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
+
+        for i in range(0, len(point) - 8, 9):
+            # coordiantes array, format is rows contain  x, y, z, w values
+            points = np.array([
+                [point[i], point[i + 3], point[i + 6]],
+                [point[i + 1], point[i + 4], point[i + 7]],
+                [point[2], point[i + 5], point[i + 8]],
+                [1, 1, 1]
+            ])
         
-        # coordiantes array, format is rows contain  x, y, z, w values
-        points = np.array([
-            [point[0], point[3], point[6]],
-            [point[1], point[4], point[7]],
-            [point[2], point[5], point[8]],
-            [1, 1, 1]
-        ])
-    
-        #applying transformations 
-        #transform -> view -> camera perspective -> screen view
-        transform =  GL.transform_matrices.pop() @ points
-        view =  GL.view_matrix @ transform
-        perspective = GL.perspective_matrix @ view
-        print("perspective: \n", perspective)
+            #applying transformations 
+            #transform -> view -> camera perspective -> screen view
+            transform =  GL.transform_matrices.pop() @ points
+            view =  GL.view_matrix @ transform
+            perspective = GL.perspective_matrix @ view
 
-        # devides all x, y, z values by w to normalize them
-        normalized_points =  perspective[:3, :] /  perspective[3, :]
+            # devides all x, y, z values by w to normalize them
+            normalized_points =  perspective[:3, :] /  perspective[3, :]
 
-        print("normalized points : \n", normalized_points)
+            # ndc = normalized device coordinates
+            # also known as homogenous coordinates
+            # projects the 3D points to 2D space (or clip space)
+            # reappends w = 1 to coordinates for screnn mapping later
+            ndc_projection = np.vstack([
+                normalized_points,
+                np.ones(normalized_points.shape[1])
+            ])
 
-        # ndc = normalized device coordinates
-        # also known as homogenous coordinates
-        # projects the 3D points to 2D space (or clip space)
-        # reappends w = 1 to coordinates for screnn mapping later
-        ndc_projection = np.vstack([
-            normalized_points,
-            np.ones(normalized_points.shape[1])
-        ])
-        print("ndc projection: \n",  ndc_projection)
+            #Mapping from camera space to screen space
+            screen_transform = np.array([
+                [GL.width / 2, 0, 0, GL.width / 2],
+                [0, -GL.height / 2, 0, GL.height / 2],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            projection_matrix = screen_transform @ ndc_projection
+            print("projection matrix: \n", projection_matrix)
 
-        #Mapping from camera space to screen space
-        screen_transform = np.array([
-            [GL.width / 2, 0, 0, GL.width / 2],
-            [0, -GL.height / 2, 0, GL.height / 2],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
-        projection_matrix = screen_transform @ ndc_projection
-        print("projection matrix: \n", projection_matrix)
+            # Flatten to get the final render points (x, y coordinates)
+            render_points  = projection_matrix[:2, :].flatten(order='F')
+            render_points  = render_points .tolist()
 
-        # Flatten to get the final render points (x, y coordinates)
-        render_points = projection_matrix[:2, :].flatten(order='F')
-        render_points = render_points.tolist()
-        print("render points: \n", render_points)
-        GL.triangleSet2D(render_points, colors)
-    
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+            #check if the points are within the screen
+            if max(render_points) > max(GL.width, GL.height) or min(render_points ) < 0:
+                continue
+            GL.triangleSet2D(render_points, colors)
+
 
     @staticmethod
-    def viewpoint(position, orientation, fieldOfView):
-        """Função usada para renderizar (na verdade coletar os dados) de Viewpoint."""
-        # Na função de viewpoint você receberá a posição, orientação e campo de visão da
-        # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
-        # perspectiva para poder aplicar nos pontos dos objetos geométricos.
+    def quarternion_rotation(points: list[int]) -> np.array:
 
-        #orientation and position matrices
- 
         #calculatin the quarternions for the rotation
-        qi = orientation[0] * math.sin(orientation[3] / 2) 
-        qj = orientation[1] * math.sin(orientation[3] / 2) 
-        qk = orientation[2] * math.sin(orientation[3] / 2)
-        qr = math.cos(orientation[3] / 2)
+        qi = points[0] * math.sin(points[3] / 2) 
+        qj = points[1] * math.sin(points[3] / 2) 
+        qk = points[2] * math.sin(points[3] / 2)
+        qr = math.cos(points[3] / 2)
 
         #normalizing the quaternions
         norm = math.sqrt(qi**2 + qj**2 + qk**2 + qr**2)
@@ -303,17 +295,28 @@ class GL:
             [2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
             [0, 0, 0, 1]
         ]) 
+        return rotation_matrix
+
+    @staticmethod
+    def viewpoint(position, orientation, fieldOfView):
+        """Função usada para renderizar (na verdade coletar os dados) de Viewpoint."""
+        # Na função de viewpoint você receberá a posição, orientação e campo de visão da
+        # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
+        # perspectiva para poder aplicar nos pontos dos objetos geométricos.
+
+        #orientation and position matrices
+        rotation_matrix = GL.quarternion_rotation(orientation)
         translation_matrix = np.array([
             [1, 0, 0, position[0]],
             [0, 1, 0, -position[1]],
             [0, 0, 1, -position[2]],
             [0, 0, 0, 1]
         ])
+
         # look at represnetes the camera orientation in relation to the world
         # view matrix represents the world orientation in relation to the camera
         look_at = np.linalg.inv(translation_matrix) @ np.linalg.inv(rotation_matrix)
         GL.view_matrix = np.linalg.inv(look_at)
-        # print("look at matrix: \n", look_at, "\n", "view matrix: \n", GL.view_matrix)
 
         #fov from camera angles to screen angles
         fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / np.hypot(GL.height, GL.width))) #might have bug?
@@ -331,14 +334,6 @@ class GL:
             [0, 0, -1, 0]
         ])
         GL.perspective_matrix = perspective_matrix
-        # print("perspective matrix: ")
-        # print(GL.perspective_matrix)
-
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("Viewpoint : ", end='')
-        # print("position = {0} ".format(position), end='')
-        # print("orientation = {0} ".format(orientation), end='')
-        # print("fieldOfView = {0} ".format(fieldOfView))
 
     @staticmethod
     def transform_in(translation, scale, rotation):
@@ -374,32 +369,12 @@ class GL:
             [0, 0, 1, translation[2]], 
             [0, 0, 0, 1]
         ])
-    
-        #calculatin the quarternions for the rotation
-        qi = rotation[0] * math.sin(rotation[3] / 2) 
-        qj = rotation[1] * math.sin(rotation[3] / 2) 
-        qk = rotation[2] * math.sin(rotation[3] / 2)
-        qr = math.cos(rotation[3] / 2)
 
-        #normalizing the quaternions
-        norm = math.sqrt(qi**2 + qj**2 + qk**2 + qr**2)
-        qi /= norm
-        qj /= norm
-        qk /= norm
-        qr /= norm
-
-        #building the rotation matrix
-        rotation_matrix = np.array([
-            [1 - 2*(qj**2 + qk**2), 2*(qi*qj - qk*qr), 2*(qi*qk + qj*qr), 0],
-            [2*(qi*qj + qk*qr), 1 - 2*(qi**2 + qk**2), 2*(qj*qk - qi*qr), 0],
-            [2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
-            [0, 0, 0, 1]
-        ]) 
+        rotation_matrix = GL.quarternion_rotation(rotation)
 
         #multiplying the matrices
         #order: translation -> rotation -> scale
         GL.transform_matrices.append(translation_matrix @ rotation_matrix @ scale_matrix)
-        print("transform matrix: ", GL.transform_matrices)
 
 
     @staticmethod
