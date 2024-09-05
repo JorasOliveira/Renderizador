@@ -224,45 +224,67 @@ class GL:
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
-
+        
+        # coordiantes array, format is rows contain  x, y, z, w values
         points = np.array([
             [point[0], point[3], point[6]],
             [point[1], point[4], point[7]],
             [point[2], point[5], point[8]],
             [1, 1, 1]
         ])
+    
+        #applying transformations 
+        #transform -> view -> camera perspective -> screen view
+        transform =  GL.transform_matrix @ points
+        view =  GL.view_matrix @ transform
+        perspective = GL.perspective_matrix @ view
+        print("perspective: \n", perspective)
 
-        transformed_matrix =  GL.transform_matrix @ points
+        # Normalize values by dividing by everything by w
+        # i know this is ugly
+        x0 = perspective[0][0]
+        y0 = perspective[1][0]
+        z0 = perspective[2][0]
+        w0 = perspective[3][0]
+        x1 = perspective[0][1]
+        y1 = perspective[1][1]
+        z1 = perspective[2][1]
+        # w1 = perspective[3][1]  
+        x2 = perspective[0][2]
+        y2 = perspective[1][2]
+        z2 = perspective[2][2]
+       #  w2 = perspective[3][2]
+        normalized_points = np.array([
+            [(x0 / w0), (y0 / w0), (z0 / w0),],
+            [(x1 / w0), (y1 / w0), (z1 / w0),],
+            [(x2 / w0), (y2 / w0), (z2 / w0),],
+        ])
+        print("normalized points 0 : \n", normalized_points)
 
-        view_matrix =  GL.view_matrix @ transformed_matrix
-
-        perspective_matrix = GL.perspective_matrix @ view_matrix
-
-        # Normalize by dividing by the w-component
-        w = perspective_matrix[3, :]
-        normalized_points = perspective_matrix[:3, :] / w 
-
-        # Create a homogeneous representation with 1s in the last row
+        # ndc = normalized device coordinates
+        # also known as homogenous coordinates
+        # projects the 3D points to 2D space (or clip space)
+        # reappends w = 1 to coordinates for screnn mapping later
         ndc_projection = np.vstack([
             normalized_points,
             np.ones(normalized_points.shape[1])
         ])
+        print("ndc projection: \n",  ndc_projection)
 
-        # Screen mapping (viewport transformation)
+        #Mapping from camera space to screen space
         screen_transform = np.array([
             [GL.width / 2, 0, 0, GL.width / 2],
             [0, -GL.height / 2, 0, GL.height / 2],
             [0, 0, 1, 0],
             [0, 0, 0, 1]
         ])
+        projection_matrix = screen_transform @ ndc_projection
 
-        projection_matrix = screen_transform @  ndc_projection
         # Flatten to get the final render points (x, y coordinates)
         render_points = projection_matrix[:2, :].flatten()
         render_points = render_points.tolist()
-        print("render points: ")
-        print(render_points)
-        GL.triangleSet2D(render_points, colors)
+        print("render points: \n", render_points)
+        # GL.triangleSet2D(render_points, colors)
     
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
         gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
@@ -303,30 +325,33 @@ class GL:
             [0, 0, 1, -position[2]],
             [0, 0, 0, 1]
         ])
+        # look_at = np.linalg.inv(rotation_matrix) @ np.linalg.inv(translation_matrix)
         look_at = rotation_matrix @ translation_matrix
-        print("look at matrix: ")
-        print(look_at)
-        #TODO -> FIX THIS SHIT
-        GL.view_matrix = look_at #there might be a problem here
-        print("view matrix: ")
-        print(GL.view_matrix)
+        # print("look at matrix: \n", look_at)
+        GL.view_matrix = np.linalg.inv(look_at)
+        # print("view matrix: ")
+        # print(GL.view_matrix)
 
-        fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / np.hypot(GL.height, GL.width))) #TEM UM ERROR AQUI
+        #fov from camera angles to screen angles
+        fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / np.hypot(GL.height, GL.width))) #might have bug?
 
         #Projection Matrix:
+
+        #deriving values from constants to be used later
         aspect_ratio = GL.width / GL.height
         top = GL.near * math.tan(fov_y)
         right = top * aspect_ratio
 
         #Perspective matrix
-        GL.perspective_matrix = np.array([
+        perspective_matrix = np.array([
             [(GL.near / right), 0, 0, 0],
             [0, (GL.near / top), 0, 0],
             [0, 0, -((GL.far + GL.near) / (GL.far - GL.near)), -((2 * GL.far * GL.near) / (GL.far - GL.near))],
             [0, 0, -1, 0]
         ])
-        print("perspective matrix: ")
-        print(GL.perspective_matrix)
+        GL.perspective_matrix = perspective_matrix
+        # print("perspective matrix: ")
+        # print(GL.perspective_matrix)
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         # print("Viewpoint : ", end='')
@@ -362,15 +387,13 @@ class GL:
             [0, 0, scale[2], 0], 
             [0, 0, 0, 1]
         ])
-        
         translation_matrix = np.array([
             [1, 0, 0, translation[0]], 
             [0, 1, 0, translation[1]], 
             [0, 0, 1, translation[2]], 
             [0, 0, 0, 1]
         ])
-        
-        #this is where the fun begins
+    
         #calculatin the quarternions for the rotation
         qi = rotation[0] * math.sin(rotation[3] / 2) 
         qj = rotation[1] * math.sin(rotation[3] / 2) 
@@ -393,11 +416,9 @@ class GL:
         ]) 
 
         #multiplying the matrices
-        #the tricky part is the order of operations, because with matrices the order matters
-        #ideally we want to rotate the object around its center, then scale it and finally translate it 
+        #order: translation -> rotation -> scale
         GL.transform_matrix = np.matmul(translation_matrix, np.matmul(rotation_matrix, scale_matrix))
-        print("transform matrix: ")
-        print(GL.transform_matrix)
+        print("transform matrix: ", GL.transform_matrix)
 
 
     @staticmethod
