@@ -33,7 +33,7 @@ class GL:
         GL.far = far
         GL.view_matrix = np.identity(4)
         GL.projection_matrix = np.identity(4)
-        GL.transform_matrix = np.identity(4)
+        GL.transform_matrices = []
         GL.perspective_matrix = np.identity(4)
 
     @staticmethod
@@ -235,7 +235,7 @@ class GL:
     
         #applying transformations 
         #transform -> view -> camera perspective -> screen view
-        transform =  GL.transform_matrix @ points
+        transform =  GL.transform_matrices.pop() @ points
         view =  GL.view_matrix @ transform
         perspective = GL.perspective_matrix @ view
         print("perspective: \n", perspective)
@@ -263,9 +263,10 @@ class GL:
             [0, 0, 0, 1]
         ])
         projection_matrix = screen_transform @ ndc_projection
+        print("projection matrix: \n", projection_matrix)
 
         # Flatten to get the final render points (x, y coordinates)
-        render_points = projection_matrix[:2, :].flatten()
+        render_points = projection_matrix[:2, :].flatten(order='F')
         render_points = render_points.tolist()
         print("render points: \n", render_points)
         GL.triangleSet2D(render_points, colors)
@@ -297,9 +298,9 @@ class GL:
 
         #building the rotation matrix
         rotation_matrix = np.array([
-            [1 - 2*(qj**2 + qk**2), 2*(qi*qj - qk*qr), - 2*(qi*qk + qj*qr), 0],
+            [1 - 2*(qj**2 + qk**2), 2*(qi*qj - qk*qr), 2*(qi*qk + qj*qr), 0],
             [2*(qi*qj + qk*qr), 1 - 2*(qi**2 + qk**2), 2*(qj*qk - qi*qr), 0],
-            [-2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
+            [2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
             [0, 0, 0, 1]
         ]) 
         translation_matrix = np.array([
@@ -397,8 +398,8 @@ class GL:
 
         #multiplying the matrices
         #order: translation -> rotation -> scale
-        GL.transform_matrix = translation_matrix @ rotation_matrix @ scale_matrix
-        print("transform matrix: ", GL.transform_matrix)
+        GL.transform_matrices.append(translation_matrix @ rotation_matrix @ scale_matrix)
+        print("transform matrix: ", GL.transform_matrices)
 
 
     @staticmethod
