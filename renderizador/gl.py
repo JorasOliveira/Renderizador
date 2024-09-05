@@ -34,6 +34,7 @@ class GL:
         GL.view_matrix = np.identity(4)
         GL.projection_matrix = np.identity(4)
         GL.transform_matrix = np.identity(4)
+        GL.perspective_matrix = np.identity(4)
 
     @staticmethod
     def polypoint2D(point, colors):
@@ -224,8 +225,45 @@ class GL:
         print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
-        # GL.triangleSet2D(point, colors)
+        points = np.array([
+            [point[0], point[3], point[6]],
+            [point[1], point[4], point[7]],
+            [point[2], point[5], point[8]],
+            [1, 1, 1]
+        ])
 
+        transformed_matrix =  GL.transform_matrix @ points
+
+        view_matrix =  GL.view_matrix @ transformed_matrix
+
+        perspective_matrix = GL.perspective_matrix @ view_matrix
+
+        # Normalize by dividing by the w-component
+        w = perspective_matrix[3, :]
+        normalized_points = perspective_matrix[:3, :] / w 
+
+        # Create a homogeneous representation with 1s in the last row
+        ndc_projection = np.vstack([
+            normalized_points,
+            np.ones(normalized_points.shape[1])
+        ])
+
+        # Screen mapping (viewport transformation)
+        screen_transform = np.array([
+            [GL.width / 2, 0, 0, GL.width / 2],
+            [0, -GL.height / 2, 0, GL.height / 2],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ])
+
+        projection_matrix = screen_transform @  ndc_projection
+        # Flatten to get the final render points (x, y coordinates)
+        render_points = projection_matrix[:2, :].flatten()
+        render_points = render_points.tolist()
+        print("render points: ")
+        print(render_points)
+        GL.triangleSet2D(render_points, colors)
+    
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
         gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
@@ -237,71 +275,64 @@ class GL:
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
 
         #orientation and position matrices
+ 
+        #calculatin the quarternions for the rotation
+        qi = orientation[0] * math.sin(orientation[3] / 2) 
+        qj = orientation[1] * math.sin(orientation[3] / 2) 
+        qk = orientation[2] * math.sin(orientation[3] / 2)
+        qr = math.cos(orientation[3] / 2)
 
-        orientation = np.array([
-            [0, 0, orientation[0], 0],
-            [0, orientation[1], 0, 0],
-            [orientation[2], 0, 0, 0],
+        #normalizing the quaternions
+        norm = math.sqrt(qi**2 + qj**2 + qk**2 + qr**2)
+        qi /= norm
+        qj /= norm
+        qk /= norm
+        qr /= norm
+
+        #building the rotation matrix
+        rotation_matrix = np.array([
+            [1 - 2*(qj**2 + qk**2), 2*(qi*qj - qk*qr), - 2*(qi*qk + qj*qr), 0],
+            [2*(qi*qj + qk*qr), 1 - 2*(qi**2 + qk**2), 2*(qj*qk - qi*qr), 0],
+            [-2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
             [0, 0, 0, 1]
-        ])
+        ]) 
 
-        position = np.array([
-            [1, 0, 0, -position[0]],
+        translation_matrix = np.array([
+            [1, 0, 0, position[0]],
             [0, 1, 0, -position[1]],
             [0, 0, 1, -position[2]],
             [0, 0, 0, 1]
         ])
-
-        GL.view_matrix = np.matmul(orientation, position)
+        look_at = rotation_matrix @ translation_matrix
+        print("look at matrix: ")
+        print(look_at)
+        #TODO -> FIX THIS SHIT
+        GL.view_matrix = look_at #there might be a problem here
         print("view matrix: ")
         print(GL.view_matrix)
 
-        fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / ((GL.height**2) / (GL.width**2))))
+        fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / np.hypot(GL.height, GL.width))) #TEM UM ERROR AQUI
 
         #Projection Matrix:
-        top = GL.near * math.tan(fov_y / 2)
-        right = top * (GL.width / GL.height)
+        aspect_ratio = GL.width / GL.height
+        top = GL.near * math.tan(fov_y)
+        right = top * aspect_ratio
 
-        p = np.array([
+        #Perspective matrix
+        GL.perspective_matrix = np.array([
             [(GL.near / right), 0, 0, 0],
             [0, (GL.near / top), 0, 0],
             [0, 0, -((GL.far + GL.near) / (GL.far - GL.near)), -((2 * GL.far * GL.near) / (GL.far - GL.near))],
             [0, 0, -1, 0]
         ])
-
-        #Mapping the points to the screen
-        scale = np.array([
-            [(GL.width / 2), 0, 0, 1],
-            [0, (GL.height / 2), 0, 1],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
-
-        translate = np.array([
-            [1, 0, 0, 1],
-            [0, 1, 0, 1],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
-
-        mirroring = np.array([
-            [1, 0, 0, 1],
-            [0, -1, 0, 1],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
-
-        #final transformation matrix, I thinkg the order is wrong...
-        GL.projection_matrix = np.matmul(mirroring, np.matmul(translate, scale))
-
-        print("camera transform matrix: ")
-        print(GL.projection_matrix)
+        print("perspective matrix: ")
+        print(GL.perspective_matrix)
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Viewpoint : ", end='')
-        print("position = {0} ".format(position), end='')
-        print("orientation = {0} ".format(orientation), end='')
-        print("fieldOfView = {0} ".format(fieldOfView))
+        # print("Viewpoint : ", end='')
+        # print("position = {0} ".format(position), end='')
+        # print("orientation = {0} ".format(orientation), end='')
+        # print("fieldOfView = {0} ".format(fieldOfView))
 
     @staticmethod
     def transform_in(translation, scale, rotation):
@@ -315,27 +346,29 @@ class GL:
         # modelos do mundo em alguma estrutura de pilha.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Transform : ", end='')
-        if translation:
-            print("translation = {0} ".format(translation), end='') # imprime no terminal
-        if scale:
-            print("scale = {0} ".format(scale), end='') # imprime no terminal
-        if rotation:
-            print("rotation = {0} ".format(rotation), end='') # imprime no terminal
-        print("")
+        # print("Transform : ", end='')
+        # if translation:
+        #     print("translation = {0} ".format(translation), end='') # imprime no terminal
+        # if scale:
+        #     print("scale = {0} ".format(scale), end='') # imprime no terminal
+        # if rotation:
+        #     print("rotation = {0} ".format(rotation), end='') # imprime no terminal
+        # print("")
 
         #these matrices are easy, they are just diagonal* matrices with the values of the scale, translation and rotation
         scale_matrix = np.array([
             [scale[0], 0, 0, 0], 
             [0, scale[1], 0, 0], 
             [0, 0, scale[2], 0], 
-            [0, 0, 0, 1]])
+            [0, 0, 0, 1]
+        ])
         
         translation_matrix = np.array([
             [1, 0, 0, translation[0]], 
             [0, 1, 0, translation[1]], 
             [0, 0, 1, translation[2]], 
-            [0, 0, 0, 1]])
+            [0, 0, 0, 1]
+        ])
         
         #this is where the fun begins
         #calculatin the quarternions for the rotation
@@ -344,21 +377,27 @@ class GL:
         qk = rotation[2] * math.sin(rotation[3] / 2)
         qr = math.cos(rotation[3] / 2)
 
+        #normalizing the quaternions
+        norm = math.sqrt(qi**2 + qj**2 + qk**2 + qr**2)
+        qi /= norm
+        qj /= norm
+        qk /= norm
+        qr /= norm
+
         #building the rotation matrix
         rotation_matrix = np.array([
             [1 - 2*(qj**2 + qk**2), 2*(qi*qj - qk*qr), 2*(qi*qk + qj*qr), 0],
             [2*(qi*qj + qk*qr), 1 - 2*(qi**2 + qk**2), 2*(qj*qk - qi*qr), 0],
             [2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
-            [0,0, 0, 1]
+            [0, 0, 0, 1]
         ]) 
 
         #multiplying the matrices
         #the tricky part is the order of operations, because with matrices the order matters
         #ideally we want to rotate the object around its center, then scale it and finally translate it 
         GL.transform_matrix = np.matmul(translation_matrix, np.matmul(rotation_matrix, scale_matrix))
-        print("transform_matrix: ")
+        print("transform matrix: ")
         print(GL.transform_matrix)
-
 
 
     @staticmethod
