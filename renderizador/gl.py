@@ -240,26 +240,6 @@ class GL:
         perspective = GL.perspective_matrix @ view
         print("perspective: \n", perspective)
 
-        # Normalize values by dividing by everything by w
-    #     # i know this is ugly
-    #     x0 = perspective[0][0]
-    #     y0 = perspective[1][0]
-    #     z0 = perspective[2][0]
-    #     w0 = perspective[3][0]
-    #     x1 = perspective[0][1]
-    #     y1 = perspective[1][1]
-    #     z1 = perspective[2][1]
-    #     # w1 = perspective[3][1]  
-    #     x2 = perspective[0][2]
-    #     y2 = perspective[1][2]
-    #     z2 = perspective[2][2]
-    #    #  w2 = perspective[3][2]
-    #     normalized_points = np.array([
-    #         [(x0 / w0), (y0 / w0), (z0 / w0),],
-    #         [(x1 / w0), (y1 / w0), (z1 / w0),],
-    #         [(x2 / w0), (y2 / w0), (z2 / w0),],
-    #     ])
-
         # devides all x, y, z values by w to normalize them
         normalized_points =  perspective[:3, :] /  perspective[3, :]
 
@@ -322,23 +302,20 @@ class GL:
             [-2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
             [0, 0, 0, 1]
         ]) 
-
         translation_matrix = np.array([
             [1, 0, 0, position[0]],
             [0, 1, 0, -position[1]],
             [0, 0, 1, -position[2]],
             [0, 0, 0, 1]
         ])
-        # look_at = np.linalg.inv(rotation_matrix) @ np.linalg.inv(translation_matrix)
-        look_at = rotation_matrix @ translation_matrix
-        # print("look at matrix: \n", look_at)
+        # look at represnetes the camera orientation in relation to the world
+        # view matrix represents the world orientation in relation to the camera
+        look_at = np.linalg.inv(translation_matrix) @ np.linalg.inv(rotation_matrix)
         GL.view_matrix = np.linalg.inv(look_at)
-        # print("view matrix: \n", GL.view_matrix)
+        # print("look at matrix: \n", look_at, "\n", "view matrix: \n", GL.view_matrix)
 
         #fov from camera angles to screen angles
         fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / np.hypot(GL.height, GL.width))) #might have bug?
-
-        #Projection Matrix:
 
         #deriving values from constants to be used later
         aspect_ratio = GL.width / GL.height
