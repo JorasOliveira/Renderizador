@@ -234,8 +234,8 @@ class GL:
                 [1, 1, 1]
             ])
         
-            #applying transformations 
-            #transform -> view -> camera perspective -> screen view
+            # applying transformations 
+            # transform -> view -> camera perspective -> screen view
             transform =  GL.transform_matrices.pop() @ points
             view =  GL.view_matrix @ transform
             perspective = GL.perspective_matrix @ view
@@ -252,7 +252,7 @@ class GL:
                 np.ones(normalized_points.shape[1])
             ])
 
-            #Mapping from camera space to screen space
+            # Mapping from camera space to screen space
             screen_transform = np.array([
                 [GL.width / 2, 0, 0, GL.width / 2],
                 [0, -GL.height / 2, 0, GL.height / 2],
@@ -260,13 +260,12 @@ class GL:
                 [0, 0, 0, 1]
             ])
             projection_matrix = screen_transform @ ndc_projection
-            print("projection matrix: \n", projection_matrix)
 
             # Flatten to get the final render points (x, y coordinates)
             render_points  = projection_matrix[:2, :].flatten(order='F')
             render_points  = render_points .tolist()
 
-            #check if the points are within the screen
+            # check if the points are within the screen
             if max(render_points) > max(GL.width, GL.height) or min(render_points ) < 0:
                 continue
             GL.triangleSet2D(render_points, colors)
@@ -274,6 +273,7 @@ class GL:
 
     @staticmethod
     def quarternion_rotation(points: list[int]) -> np.array:
+        """Returns the rotation matrix from the quarternion values."""
 
         #calculatin the quarternions for the rotation
         qi = points[0] * math.sin(points[3] / 2) 
@@ -304,10 +304,10 @@ class GL:
         # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
 
-        #orientation and position matrices
+        # orientation and position matrices
         rotation_matrix = GL.quarternion_rotation(orientation)
         translation_matrix = np.array([
-            [1, 0, 0, position[0]],
+            [1, 0, 0, -position[0]],
             [0, 1, 0, -position[1]],
             [0, 0, 1, -position[2]],
             [0, 0, 0, 1]
@@ -318,15 +318,15 @@ class GL:
         look_at = np.linalg.inv(translation_matrix) @ np.linalg.inv(rotation_matrix)
         GL.view_matrix = np.linalg.inv(look_at)
 
-        #fov from camera angles to screen angles
-        fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / np.hypot(GL.height, GL.width))) #might have bug?
+        # fov from camera angles to screen angles
+        fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / np.hypot(GL.height, GL.width)))
 
-        #deriving values from constants to be used later
+        # deriving values from constants to be used in perspective matrix
         aspect_ratio = GL.width / GL.height
         top = GL.near * math.tan(fov_y)
         right = top * aspect_ratio
 
-        #Perspective matrix
+        # Perspective matrix
         perspective_matrix = np.array([
             [(GL.near / right), 0, 0, 0],
             [0, (GL.near / top), 0, 0],
@@ -346,34 +346,21 @@ class GL:
         # Quando se entrar em um nó transform se deverá salvar a matriz de transformação dos
         # modelos do mundo em alguma estrutura de pilha.
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("Transform : ", end='')
-        # if translation:
-        #     print("translation = {0} ".format(translation), end='') # imprime no terminal
-        # if scale:
-        #     print("scale = {0} ".format(scale), end='') # imprime no terminal
-        # if rotation:
-        #     print("rotation = {0} ".format(rotation), end='') # imprime no terminal
-        # print("")
-
-        #these matrices are easy, they are just diagonal* matrices with the values of the scale, translation and rotation
-        scale_matrix = np.array([
-            [scale[0], 0, 0, 0], 
-            [0, scale[1], 0, 0], 
-            [0, 0, scale[2], 0], 
-            [0, 0, 0, 1]
-        ])
         translation_matrix = np.array([
             [1, 0, 0, translation[0]], 
             [0, 1, 0, translation[1]], 
             [0, 0, 1, translation[2]], 
             [0, 0, 0, 1]
         ])
-
+        scale_matrix = np.array([
+            [scale[0], 0, 0, 0], 
+            [0, scale[1], 0, 0], 
+            [0, 0, scale[2], 0], 
+            [0, 0, 0, 1]
+        ])
         rotation_matrix = GL.quarternion_rotation(rotation)
 
-        #multiplying the matrices
-        #order: translation -> rotation -> scale
+        # always follow the order: translation -> rotation -> scale
         GL.transform_matrices.append(translation_matrix @ rotation_matrix @ scale_matrix)
 
 
