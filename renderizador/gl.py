@@ -241,25 +241,29 @@ class GL:
         print("perspective: \n", perspective)
 
         # Normalize values by dividing by everything by w
-        # i know this is ugly
-        x0 = perspective[0][0]
-        y0 = perspective[1][0]
-        z0 = perspective[2][0]
-        w0 = perspective[3][0]
-        x1 = perspective[0][1]
-        y1 = perspective[1][1]
-        z1 = perspective[2][1]
-        # w1 = perspective[3][1]  
-        x2 = perspective[0][2]
-        y2 = perspective[1][2]
-        z2 = perspective[2][2]
-       #  w2 = perspective[3][2]
-        normalized_points = np.array([
-            [(x0 / w0), (y0 / w0), (z0 / w0),],
-            [(x1 / w0), (y1 / w0), (z1 / w0),],
-            [(x2 / w0), (y2 / w0), (z2 / w0),],
-        ])
-        print("normalized points 0 : \n", normalized_points)
+    #     # i know this is ugly
+    #     x0 = perspective[0][0]
+    #     y0 = perspective[1][0]
+    #     z0 = perspective[2][0]
+    #     w0 = perspective[3][0]
+    #     x1 = perspective[0][1]
+    #     y1 = perspective[1][1]
+    #     z1 = perspective[2][1]
+    #     # w1 = perspective[3][1]  
+    #     x2 = perspective[0][2]
+    #     y2 = perspective[1][2]
+    #     z2 = perspective[2][2]
+    #    #  w2 = perspective[3][2]
+    #     normalized_points = np.array([
+    #         [(x0 / w0), (y0 / w0), (z0 / w0),],
+    #         [(x1 / w0), (y1 / w0), (z1 / w0),],
+    #         [(x2 / w0), (y2 / w0), (z2 / w0),],
+    #     ])
+
+        # devides all x, y, z values by w to normalize them
+        normalized_points =  perspective[:3, :] /  perspective[3, :]
+
+        print("normalized points : \n", normalized_points)
 
         # ndc = normalized device coordinates
         # also known as homogenous coordinates
@@ -284,7 +288,7 @@ class GL:
         render_points = projection_matrix[:2, :].flatten()
         render_points = render_points.tolist()
         print("render points: \n", render_points)
-        # GL.triangleSet2D(render_points, colors)
+        GL.triangleSet2D(render_points, colors)
     
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
         gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
@@ -329,8 +333,7 @@ class GL:
         look_at = rotation_matrix @ translation_matrix
         # print("look at matrix: \n", look_at)
         GL.view_matrix = np.linalg.inv(look_at)
-        # print("view matrix: ")
-        # print(GL.view_matrix)
+        # print("view matrix: \n", GL.view_matrix)
 
         #fov from camera angles to screen angles
         fov_y = 2 * math.atan(math.tan(fieldOfView / 2) * (GL.height / np.hypot(GL.height, GL.width))) #might have bug?
@@ -417,7 +420,7 @@ class GL:
 
         #multiplying the matrices
         #order: translation -> rotation -> scale
-        GL.transform_matrix = np.matmul(translation_matrix, np.matmul(rotation_matrix, scale_matrix))
+        GL.transform_matrix = translation_matrix @ rotation_matrix @ scale_matrix
         print("transform matrix: ", GL.transform_matrix)
 
 
