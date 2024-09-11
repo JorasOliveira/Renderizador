@@ -82,8 +82,8 @@ class GL:
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o Polyline2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
 
-        print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
-        print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
+        # print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
         
         # Saving the colors in their respective variable, using emissive colors.
         r = int(colors["emissiveColor"][0] * 255) 
@@ -142,8 +142,8 @@ class GL:
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o Circle2D
         # você pode assumir o desenho das linhas com a cor emissiva (emissiveColor).
 
-        print("Circle2D : radius = {0}".format(radius)) # imprime no terminal
-        print("Circle2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("Circle2D : radius = {0}".format(radius)) # imprime no terminal
+        # print("Circle2D : colors = {0}".format(colors)) # imprime no terminal as cores
         
         # Exemplo:
         pos_x = GL.width//2
@@ -163,8 +163,6 @@ class GL:
         # quantidade de pontos é sempre multiplo de 3, ou seja, 6 valores ou 12 valores, etc.
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o TriangleSet2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
-        print("TriangleSet2D : vertices = {0}".format(vertices)) # imprime no terminal
-        print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Saving the colors in their respective variable, using emissive colors.
         r = int(colors["emissiveColor"][0] * 255) 
@@ -227,8 +225,8 @@ class GL:
         # tipos de cores.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
-        print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
+        # print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
         for i in range(0, len(point) - 8, 9):
             # coordiantes array, format is rows contain  x, y, z, w values
@@ -238,10 +236,15 @@ class GL:
                 [point[2], point[i + 5], point[i + 8]],
                 [1, 1, 1]
             ])
+            # print("TriangleSet : points = {0}".format(points))
         
             # applying transformations 
             # transform -> view -> camera perspective -> screen view
+
+            if not GL.transform_matrices:
+                continue
             transform =  GL.transform_matrices.pop() @ points
+            print("we poped and item from the transform matrices")
             view =  GL.view_matrix @ transform
             perspective = GL.perspective_matrix @ view
 
@@ -271,6 +274,7 @@ class GL:
             render_points  = render_points .tolist()
 
             # check if the points are within the screen
+            #TODO -fix logic bug here, ex: max(205, 198) > max(200, 300) the point should not be drawn but is  
             if max(render_points) > max(GL.width, GL.height) or min(render_points ) < 0:
                 continue
             GL.triangleSet2D(render_points, colors)
@@ -398,14 +402,34 @@ class GL:
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("TriangleStripSet : pontos = {0} ".format(point), end='')
-        for i, strip in enumerate(stripCount):
-            print("strip[{0}] = {1} ".format(i, strip), end='')
-        print("")
-        print("TriangleStripSet : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("the number of points is: ", len(point))
+        # print("the number of points devided by 3 is: ", len(point) / 3)
+        # print("TriangleStripSet : pontos = {0} ".format(point), end='')
+        # for i, strip in enumerate(stripCount):
+        #     print("strip[{0}] = {1} ".format(i, strip), end='')
+        # print("")
+        # print("TriangleStripSet : colors = {0}".format(colors)) # imprime no terminal as cores
+        
+        triangle_strip = []
+        for strip in (stripCount):
+            for i in range((strip * 3) - 8):
+                x_0, y_0, z_0 = point[i], point[i + 1], point[i + 2]
+                x_1, y_1, z_1 = point[i + 3], point[i + 4], point[i + 5]
+                x_2, y_2, z_2 = point[i + 6], point[i + 7], point[i + 8]
 
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+                points = [(x_0, y_0, z_0), (x_1, y_1, z_1), (x_2, y_2, z_2)]
+
+                # we have to change the order because of how the triangle strip is rendered, all vertices must be in counter clockwise order
+                if i % 2 != 0:
+                    points[1], points[2] = points[2], points[1] 
+
+                for point_set in points:
+                    triangle_strip.extend(point_set)
+            GL.triangleSet(triangle_strip, colors)
+
+        # print("ist sent to triangleSet: {0}".format(triangle_strip))
+        
+
 
     @staticmethod
     def indexedTriangleStripSet(point, index, colors):
@@ -427,8 +451,30 @@ class GL:
         print("IndexedTriangleStripSet : pontos = {0}, index = {1}".format(point, index))
         print("IndexedTriangleStripSet : colors = {0}".format(colors)) # imprime as cores
 
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        vertices = {}
+        for i in range(len(point) - 3):
+            x = point[i]
+            y = point[i + 1]
+            z = point[i + 2]
+            vertices[i] = (x, y, z)
+
+        triangle_strip = []
+        i = 0
+        while index[i] != -1:
+            points = [vertices[i], vertices[i + 1], vertices[i + 2]]
+
+            # we have to change the order because of how the triangle strip is rendered, all vertices must be in counter clockwise order
+            if i % 2 != 0:
+                points[1], points[2] = points[2], points[1] 
+            for point_set in points:
+                triangle_strip.extend(point_set)
+            i += 1
+
+        # print("list sent to triangleSet: {0}".format(triangle_strip))
+        GL.triangleSet(triangle_strip, colors)
+
+
+
 
     @staticmethod
     def indexedFaceSet(coord, coordIndex, colorPerVertex, color, colorIndex,
