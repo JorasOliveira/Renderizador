@@ -240,10 +240,7 @@ class GL:
         
             # applying transformations 
             # transform -> view -> camera perspective -> screen view
-
-            if not GL.transform_matrices:
-                continue
-            transform =  GL.transform_matrices.pop() @ points
+            transform =  GL.transform_matrices[-1] @ points
             print("we poped and item from the transform matrices")
             view =  GL.view_matrix @ transform
             perspective = GL.perspective_matrix @ view
@@ -384,6 +381,8 @@ class GL:
         # pilha implementada.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
+        if GL.transform_matrices:
+            GL.transform_matrices.pop()
         print("Saindo de Transform")
 
     @staticmethod
