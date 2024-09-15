@@ -241,7 +241,6 @@ class GL:
             # applying transformations 
             # transform -> view -> camera perspective -> screen view
             transform =  GL.transform_matrices[-1] @ points
-            print("we poped and item from the transform matrices")
             view =  GL.view_matrix @ transform
             perspective = GL.perspective_matrix @ view
 
@@ -369,7 +368,10 @@ class GL:
         rotation_matrix = GL.quarternion_rotation(rotation)
 
         # always follow the order: translation -> rotation -> scale
-        GL.transform_matrices.append(translation_matrix @ rotation_matrix @ scale_matrix)
+        transformation_matrix = translation_matrix @ rotation_matrix @ scale_matrix
+        if GL.transform_matrices:
+            GL.transform_matrices.append(GL.transform_matrices[-1] @ transformation_matrix)
+        else: GL.transform_matrices.append(transformation_matrix)
 
 
     @staticmethod
@@ -383,7 +385,7 @@ class GL:
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         if GL.transform_matrices:
             GL.transform_matrices.pop()
-        print("Saindo de Transform")
+        # print("Saindo de Transform")
 
     @staticmethod
     def triangleStripSet(point, stripCount, colors):
@@ -408,26 +410,29 @@ class GL:
         #     print("strip[{0}] = {1} ".format(i, strip), end='')
         # print("")
         # print("TriangleStripSet : colors = {0}".format(colors)) # imprime no terminal as cores
-        
         triangle_strip = []
-        for strip in (stripCount):
-            for i in range((strip * 3) - 8):
-                x_0, y_0, z_0 = point[i], point[i + 1], point[i + 2]
-                x_1, y_1, z_1 = point[i + 3], point[i + 4], point[i + 5]
-                x_2, y_2, z_2 = point[i + 6], point[i + 7], point[i + 8]
+        offset = 0
+        for strip in stripCount:
+            for i in range(strip - 2):  # Each strip forms (strip - 2) triangles
+                idx1 = offset + i
+                idx2 = offset + i + 1
+                idx3 = offset + i + 2
 
+                x_0, y_0, z_0 = point[idx1 * 3], point[idx1 * 3 + 1], point[idx1 * 3 + 2]
+                x_1, y_1, z_1 = point[idx2 * 3], point[idx2 * 3 + 1], point[idx2 * 3 + 2]
+                x_2, y_2, z_2 = point[idx3 * 3], point[idx3 * 3 + 1], point[idx3 * 3 + 2]
+
+                # Change the order for every second triangle to ensure counterclockwise orientation
                 points = [(x_0, y_0, z_0), (x_1, y_1, z_1), (x_2, y_2, z_2)]
-
-                # we have to change the order because of how the triangle strip is rendered, all vertices must be in counter clockwise order
                 if i % 2 != 0:
-                    points[1], points[2] = points[2], points[1] 
+                    points[1], points[2] = points[2], points[1]
 
                 for point_set in points:
                     triangle_strip.extend(point_set)
-            GL.triangleSet(triangle_strip, colors)
+            
+            offset += strip  # Move to the next set of points
 
-        # print("ist sent to triangleSet: {0}".format(triangle_strip))
-        
+        GL.triangleSet(triangle_strip, colors)
 
 
     @staticmethod
@@ -447,31 +452,41 @@ class GL:
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("IndexedTriangleStripSet : pontos = {0}, index = {1}".format(point, index))
-        print("IndexedTriangleStripSet : colors = {0}".format(colors)) # imprime as cores
+        # print("IndexedTriangleStripSet : pontos = {0}, index = {1}".format(point, index))
+        # print("IndexedTriangleStripSet : colors = {0}".format(colors)) # imprime as cores
 
         vertices = {}
-        for i in range(len(point) - 3):
-            x = point[i]
-            y = point[i + 1]
-            z = point[i + 2]
-            vertices[i] = (x, y, z)
+        for i in range(0, len(point), 3):
+            vertices[i // 3] = (point[i], point[i + 1], point[i + 2])
 
         triangle_strip = []
         i = 0
-        while index[i] != -1:
-            points = [vertices[i], vertices[i + 1], vertices[i + 2]]
+        
+        while i < len(index):
+            if index[i] == -1:
+                i += 1
+                continue  # Skip to the next index after encountering -1
 
-            # we have to change the order because of how the triangle strip is rendered, all vertices must be in counter clockwise order
+            # Ensure that we do not go out of bounds when fetching index[i+2]
+            if i + 2 >= len(index) or index[i + 1] == -1 or index[i + 2] == -1:
+                break
+
+            idx1 = index[i]
+            idx2 = index[i + 1]
+            idx3 = index[i + 2]
+
+            points = [vertices[idx1], vertices[idx2], vertices[idx3]]
+
+            # Adjust for counterclockwise orientation
             if i % 2 != 0:
-                points[1], points[2] = points[2], points[1] 
+                points[1], points[2] = points[2], points[1]
+
             for point_set in points:
                 triangle_strip.extend(point_set)
-            i += 1
 
-        # print("list sent to triangleSet: {0}".format(triangle_strip))
+            i += 1 
+
         GL.triangleSet(triangle_strip, colors)
-
 
 
 
@@ -500,22 +515,57 @@ class GL:
         # implementadado um método para a leitura de imagens.
 
         # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("IndexedFaceSet : ")
-        if coord:
-            print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
-        print("colorPerVertex = {0}".format(colorPerVertex))
-        if colorPerVertex and color and colorIndex:
-            print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
-        if texCoord and texCoordIndex:
-            print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
-        if current_texture:
-            image = gpu.GPU.load_texture(current_texture[0])
-            print("\t Matriz com image = {0}".format(image))
-            print("\t Dimensões da image = {0}".format(image.shape))
-        print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
+        # print("IndexedFaceSet : ")
+        # if coord:
+        #     print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
+        # print("colorPerVertex = {0}".format(colorPerVertex))
+        # if colorPerVertex and color and colorIndex:
+        #     print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
+        # if texCoord and texCoordIndex:
+        #     print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
+        # if current_texture:
+        #     image = gpu.GPU.load_texture(current_texture[0])
+        #     print("\t Matriz com image = {0}".format(image))
+        #     print("\t Dimensões da image = {0}".format(image.shape))
+        # print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
 
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        
+        vertices = {}
+        for i in range(0, len(coord), 3):
+            vertices[i // 3] = (coord[i], coord[i + 1], coord[i + 2])
+
+        triangles = []
+        i = 0
+        
+        while i < len(coordIndex):
+            if coordIndex[i] == -1:
+                i += 1
+                continue  # Skip to the next index after encountering -1
+
+            # Collect indices for a single face (polygon)
+            face_indices = []
+            while i < len(coordIndex) and coordIndex[i] != -1:
+                face_indices.append(coordIndex[i])
+                i += 1
+
+            # Triangulate the face if it has more than 3 vertices (fan triangulation)
+            for j in range(1, len(face_indices) - 1):
+                idx1 = face_indices[0]
+                idx2 = face_indices[j]
+                idx3 = face_indices[j + 1]
+
+                # Fetch the vertices corresponding to the indices
+                points = [vertices[idx1], vertices[idx2], vertices[idx3]]
+
+                # No need to flip orientation like in Triangle Strip; faces are independent
+                for point_set in points:
+                    triangles.extend(point_set)
+
+            i += 1  # Move past the -1 to process the next face
+
+        # Send the computed triangles to the GPU
+        GL.triangleSet(triangles, colors)
+
 
     @staticmethod
     def box(size, colors):
