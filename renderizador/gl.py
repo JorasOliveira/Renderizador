@@ -15,6 +15,7 @@ import time         # Para operações com tempo
 import gpu          # Simula os recursos de uma GPU
 import math         # Funções matemáticas
 import numpy as np  # Biblioteca do Numpy
+from typing import Tuple, List, Dict, Optional # type hinting
 
 class GL:
     """Classe que representa a biblioteca gráfica (Graphics Library)."""
@@ -35,6 +36,57 @@ class GL:
         GL.projection_matrix = np.identity(4)
         GL.transform_matrices = []
         GL.perspective_matrix = np.identity(4)
+
+    @staticmethod
+    def barycentric_coordinates(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> Tuple[float, float, float]:
+        """
+        Calculate barycentric coordinates of point p with respect to triangle abc.
+        """
+        v0: np.ndarray = b - a
+        v1: np.ndarray = c - a
+        v2: np.ndarray = p - a
+        d00: float = np.dot(v0, v0)
+        d01: float = np.dot(v0, v1)
+        d11: float = np.dot(v1, v1)
+        d20: float = np.dot(v2, v0)
+        d21: float = np.dot(v2, v1)
+        denom: float = d00 * d11 - d01 * d01
+
+        # Check if the triangle is degenerate
+        if abs(denom) < 1e-6:
+            return -1.0, -1.0, -1.0  # Return invalid coordinates
+
+        v: float = (d11 * d20 - d01 * d21) / denom
+        w: float = (d00 * d21 - d01 * d20) / denom
+        u: float = 1.0 - v - w
+
+        return u, v, w
+
+    @staticmethod
+    def quarternion_rotation(points: list[int]) -> np.array:
+        """Returns the rotation matrix from the quarternion values."""
+
+        #calculatin the quarternions for the rotation
+        qi = points[0] * math.sin(points[3] / 2) 
+        qj = points[1] * math.sin(points[3] / 2) 
+        qk = points[2] * math.sin(points[3] / 2)
+        qr = math.cos(points[3] / 2)
+
+        #normalizing the quaternions
+        norm = math.sqrt(qi**2 + qj**2 + qk**2 + qr**2)
+        qi /= norm
+        qj /= norm
+        qk /= norm
+        qr /= norm
+
+        #building the rotation matrix
+        rotation_matrix = np.array([
+            [1 - 2*(qj**2 + qk**2), 2*(qi*qj - qk*qr), 2*(qi*qk + qj*qr), 0],
+            [2*(qi*qj + qk*qr), 1 - 2*(qi**2 + qk**2), 2*(qj*qk - qi*qr), 0],
+            [2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
+            [0, 0, 0, 1]
+        ]) 
+        return rotation_matrix
 
     @staticmethod
     def polypoint2D(point, colors):
@@ -153,7 +205,7 @@ class GL:
 
 
     @staticmethod
-    def triangleSet2D(vertices, colors):
+    def triangleSet2D(vertices, colors, vertex_colors=None, w_values=None):
         """Função usada para renderizar TriangleSet2D."""
         # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/geometry2D.html#TriangleSet2D
         # Nessa função você receberá os vertices de um triângulo no parâmetro vertices,
@@ -171,36 +223,60 @@ class GL:
 
         for i in range(0, len(vertices), 6):
             #all vertices are saved as points
-            x_0 = int(vertices[i])
-            y_0 = int(vertices[i + 1])
-            x_1 = int(vertices[i + 2])
-            y_1 = int(vertices[i + 3])
-            x_2 = int(vertices[i + 4])
-            y_2 = int(vertices[i + 5])
-
-            # drawing the lines from vertice to vertice 
-            # points are always ordered in CCW for some reason
-            GL.polyline2D([x_0, y_0, x_1, y_1], colors)
-            GL.polyline2D([x_1, y_1, x_2, y_2], colors)
-            GL.polyline2D([x_2, y_2, x_0, y_0], colors)
+            x_0, y_0 = int(vertices[0]), int(vertices[1])
+            x_1, y_1 = int(vertices[2]), int(vertices[3])
+            x_2, y_2 = int(vertices[4]), int(vertices[5])
 
             # figuring out if a point is withing a triangle or not
             # L(x, y) = x(y1 – y0) – y(x1 – x0) + y0(x1 – x0) – x0(y1 – y0)
             # if (L1 >= 0 && L2 >= 0 && L3 >= 0) p is inside the triangle 
             # with bounding box optmization
 
-            x_min = min(x_0, x_1, x_2)
-            x_max = max(x_0, x_1, x_2)
-            y_min = min(y_0, y_1, y_2)
-            y_max = max(y_0, y_1, y_2)
+            # Check if the triangle is completely outside the screen
+            if (max(x_0, x_1, x_2) < 0 or min(x_0, x_1, x_2) >= GL.width or
+                max(y_0, y_1, y_2) < 0 or min(y_0, y_1, y_2) >= GL.height):
+                return  # Skip this triangle
+
+            # Bounding box (clamped to screen dimensions)
+            x_min = max(min(x_0, x_1, x_2), 0)
+            x_max = min(max(x_0, x_1, x_2), GL.width - 1)
+            y_min = max(min(y_0, y_1, y_2), 0)
+            y_max = min(max(y_0, y_1, y_2), GL.height - 1)
+
+            v1 = np.array([x_0, y_0])
+            v2 = np.array([x_1, y_1])
+            v3 = np.array([x_2, y_2])
+
+            if vertex_colors is not None:
+                c1 = np.array(vertex_colors[0:3])
+                c2 = np.array(vertex_colors[3:6])
+                c3 = np.array(vertex_colors[6:9])
+            else:
+                c1 = c2 = c3 = np.array(colors["emissiveColor"])
+
+            # Precalculate 1/w for each vertex if w_values are provided
+            if w_values is not None:
+                w1, w2, w3 = 1/w_values[0], 1/w_values[1], 1/w_values[2]
+            else:
+                w1 = w2 = w3 = 1.0  
 
             for x in range(x_min, x_max + 1):
                 for y in range(y_min, y_max + 1):
-                    l_1 = x * (y_1 - y_0) - y * (x_1 - x_0) + y_0 * (x_1 - x_0) - x_0 * (y_1 - y_0)
-                    l_2 = x * (y_2 - y_1) - y * (x_2 - x_1) + y_1 * (x_2 - x_1) - x_1 * (y_2 - y_1)
-                    l_3 = x * (y_0 - y_2) - y * (x_0 - x_2) + y_2 * (x_0 - x_2) - x_2 * (y_0 - y_2)
+                    p = np.array([x, y])
+                    u, v, w = GL.barycentric_coordinates(p, v1, v2, v3)
+                    u, v, w = round(u, 15), round(v, 15), round(w, 15)
+                    
+                    epsilon = -1e-6
+                    if u >= epsilon and v >= epsilon and w >= epsilon:
+                        # Perspective-correct interpolation
+                        z = 1 / (u * w1 + v * w2 + w * w3)
+                        u_corrected = u * w1 * z
+                        v_corrected = v * w2 * z
+                        w_corrected = w * w3 * z
 
-                    if (l_1 >= 0) and (l_2 >= 0) and (l_3 >= 0):
+                        color = u_corrected * c1 + v_corrected * c2 + w_corrected * c3
+                        r, g, b = [int(max(0, min(255, c * 255))) for c in color]
+
                         gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
 
         # Exemplo:
@@ -208,7 +284,7 @@ class GL:
 
 
     @staticmethod
-    def triangleSet(point, colors):
+    def triangleSet(point, colors, vertex_colors=None):
         """Função usada para renderizar TriangleSet."""
         # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/rendering.html#TriangleSet
         # Nessa função você receberá pontos no parâmetro point, esses pontos são uma lista
@@ -227,7 +303,7 @@ class GL:
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         # print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         # print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
-
+       
         for i in range(0, len(point) - 8, 9):
             # coordiantes array, format is rows contain  x, y, z, w values
             points = np.array([
@@ -236,21 +312,18 @@ class GL:
                 [point[2], point[i + 5], point[i + 8]],
                 [1, 1, 1]
             ])
-            # print("TriangleSet : points = {0}".format(points))
-        
-            # applying transformations 
-            # transform -> view -> camera perspective -> screen view
-            transform =  GL.transform_matrices[-1] @ points
-            view =  GL.view_matrix @ transform
+            # Applying transformations 
+            transform = GL.transform_matrices[-1] @ points
+            view = GL.view_matrix @ transform
             perspective = GL.perspective_matrix @ view
 
-            # devides all x, y, z values by w to normalize them
-            normalized_points =  perspective[:3, :] /  perspective[3, :]
+            # W values for perspective correction later
+            w_values = perspective[3, :]
 
-            # ndc = normalized device coordinates
-            # also known as homogenous coordinates
-            # projects the 3D points to 2D space (or clip space)
-            # reappends w = 1 to coordinates for screnn mapping later
+            # Divides all x, y, z values by w to normalize them
+            normalized_points = perspective[:3, :] / perspective[3, :]
+
+            # NDC projection
             ndc_projection = np.vstack([
                 normalized_points,
                 np.ones(normalized_points.shape[1])
@@ -266,41 +339,10 @@ class GL:
             projection_matrix = screen_transform @ ndc_projection
 
             # Flatten to get the final render points (x, y coordinates)
-            render_points  = projection_matrix[:2, :].flatten(order='F')
-            render_points  = render_points .tolist()
+            render_points = projection_matrix[:2, :].flatten(order='F')
+            render_points = render_points.tolist()
 
-            # check if the points are within the screen
-            #TODO -fix logic bug here, ex: max(205, 198) > max(200, 300) the point should not be drawn but is  
-            if max(render_points) > max(GL.width, GL.height) or min(render_points ) < 0:
-                continue
-            GL.triangleSet2D(render_points, colors)
-
-
-    @staticmethod
-    def quarternion_rotation(points: list[int]) -> np.array:
-        """Returns the rotation matrix from the quarternion values."""
-
-        #calculatin the quarternions for the rotation
-        qi = points[0] * math.sin(points[3] / 2) 
-        qj = points[1] * math.sin(points[3] / 2) 
-        qk = points[2] * math.sin(points[3] / 2)
-        qr = math.cos(points[3] / 2)
-
-        #normalizing the quaternions
-        norm = math.sqrt(qi**2 + qj**2 + qk**2 + qr**2)
-        qi /= norm
-        qj /= norm
-        qk /= norm
-        qr /= norm
-
-        #building the rotation matrix
-        rotation_matrix = np.array([
-            [1 - 2*(qj**2 + qk**2), 2*(qi*qj - qk*qr), 2*(qi*qk + qj*qr), 0],
-            [2*(qi*qj + qk*qr), 1 - 2*(qi**2 + qk**2), 2*(qj*qk - qi*qr), 0],
-            [2*(qi*qk - qj*qr), 2*(qj*qk + qi*qr), 1 - 2*(qi**2 + qj**2), 0],
-            [0, 0, 0, 1]
-        ]) 
-        return rotation_matrix
+            GL.triangleSet2D(render_points, colors, w_values=w_values, vertex_colors=vertex_colors)
 
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
@@ -463,9 +505,10 @@ class GL:
         i = 0
         
         while i < len(index):
+            # -1 indicates end of current strip
             if index[i] == -1:
                 i += 1
-                continue  # Skip to the next index after encountering -1
+                continue
 
             # Ensure that we do not go out of bounds when fetching index[i+2]
             if i + 2 >= len(index) or index[i + 1] == -1 or index[i + 2] == -1:
@@ -487,7 +530,6 @@ class GL:
             i += 1 
 
         GL.triangleSet(triangle_strip, colors)
-
 
 
     @staticmethod
@@ -528,43 +570,46 @@ class GL:
         #     print("\t Matriz com image = {0}".format(image))
         #     print("\t Dimensões da image = {0}".format(image.shape))
         # print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
-
         
+        #creagin a list of vertices and colors
         vertices = {}
         for i in range(0, len(coord), 3):
-            vertices[i // 3] = (coord[i], coord[i + 1], coord[i + 2])
+            vertices[i // 3] = coord[i:i+3]
 
-        triangles = []
+        vertex_colors = {}
+        if colorPerVertex and color:
+            for i in range(0, len(color), 3):
+                vertex_colors[i // 3] = (color[i:i+3])
+
+        #calculating the triangles 
         i = 0
-        
         while i < len(coordIndex):
             if coordIndex[i] == -1:
                 i += 1
-                continue  # Skip to the next index after encountering -1
+                continue
 
-            # Collect indices for a single face (polygon)
             face_indices = []
             while i < len(coordIndex) and coordIndex[i] != -1:
                 face_indices.append(coordIndex[i])
                 i += 1
 
-            # Triangulate the face if it has more than 3 vertices (fan triangulation)
             for j in range(1, len(face_indices) - 1):
-                idx1 = face_indices[0]
-                idx2 = face_indices[j]
-                idx3 = face_indices[j + 1]
+                idx1, idx2, idx3 = face_indices[0], face_indices[j], face_indices[j + 1]
+                v1, v2, v3 = vertices[idx1], vertices[idx2], vertices[idx3]
 
-                # Fetch the vertices corresponding to the indices
-                points = [vertices[idx1], vertices[idx2], vertices[idx3]]
+                triangle_points = v1 + v2 + v3
 
-                # No need to flip orientation like in Triangle Strip; faces are independent
-                for point_set in points:
-                    triangles.extend(point_set)
+                if colorPerVertex and color:
+                    c1, c2, c3 = vertex_colors[idx1], vertex_colors[idx2], vertex_colors[idx3]
+                    triangle_colors = c1 + c2 + c3
+                else:
+                    triangle_colors = colors["emissiveColor"] * 3
 
-            i += 1  # Move past the -1 to process the next face
+                GL.triangleSet(triangle_points, colors, vertex_colors=triangle_colors)
 
-        # Send the computed triangles to the GPU
-        GL.triangleSet(triangles, colors)
+        i += 1
+            
+
 
 
     @staticmethod
