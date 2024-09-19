@@ -36,6 +36,8 @@ class GL:
         GL.projection_matrix = np.identity(4)
         GL.transform_matrices = []
         GL.perspective_matrix = np.identity(4)
+        GL.vertex_colors = None
+        GL.w_values = None
 
     @staticmethod
     def barycentric_coordinates(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> Tuple[float, float, float]:
@@ -205,7 +207,7 @@ class GL:
 
 
     @staticmethod
-    def triangleSet2D(vertices, colors, vertex_colors=None, w_values=None):
+    def triangleSet2D(vertices, colors):
         """Função usada para renderizar TriangleSet2D."""
         # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/geometry2D.html#TriangleSet2D
         # Nessa função você receberá os vertices de um triângulo no parâmetro vertices,
@@ -247,16 +249,16 @@ class GL:
             v2 = np.array([x_1, y_1])
             v3 = np.array([x_2, y_2])
 
-            if vertex_colors is not None:
-                c1 = np.array(vertex_colors[0:3])
-                c2 = np.array(vertex_colors[3:6])
-                c3 = np.array(vertex_colors[6:9])
+            if GL.vertex_colors is not None:
+                c1 = np.array(GL.vertex_colors[0:3])
+                c2 = np.array(GL.vertex_colors[3:6])
+                c3 = np.array(GL.vertex_colors[6:9])
             else:
                 c1 = c2 = c3 = np.array(colors["emissiveColor"])
 
             # Precalculate 1/w for each vertex if w_values are provided
-            if w_values is not None:
-                w1, w2, w3 = 1/w_values[0], 1/w_values[1], 1/w_values[2]
+            if GL.w_values is not None:
+                w1, w2, w3 = 1/GL.w_values[0], 1/GL.w_values[1], 1/GL.w_values[2]
             else:
                 w1 = w2 = w3 = 1.0  
 
@@ -284,7 +286,7 @@ class GL:
 
 
     @staticmethod
-    def triangleSet(point, colors, vertex_colors=None):
+    def triangleSet(point, colors):
         """Função usada para renderizar TriangleSet."""
         # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/rendering.html#TriangleSet
         # Nessa função você receberá pontos no parâmetro point, esses pontos são uma lista
@@ -319,6 +321,7 @@ class GL:
 
             # W values for perspective correction later
             w_values = perspective[3, :]
+            GL.w_values = w_values
 
             # Divides all x, y, z values by w to normalize them
             normalized_points = perspective[:3, :] / perspective[3, :]
@@ -342,8 +345,8 @@ class GL:
             render_points = projection_matrix[:2, :].flatten(order='F')
             render_points = render_points.tolist()
 
-            GL.triangleSet2D(render_points, colors, w_values=w_values, vertex_colors=vertex_colors)
 
+            GL.triangleSet2D(render_points, colors)
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
         """Função usada para renderizar (na verdade coletar os dados) de Viewpoint."""
@@ -580,6 +583,7 @@ class GL:
         if colorPerVertex and color:
             for i in range(0, len(color), 3):
                 vertex_colors[i // 3] = (color[i:i+3])
+                # GL.vertex_colors = vertex_colors
 
         #calculating the triangles 
         i = 0
@@ -602,10 +606,11 @@ class GL:
                 if colorPerVertex and color:
                     c1, c2, c3 = vertex_colors[idx1], vertex_colors[idx2], vertex_colors[idx3]
                     triangle_colors = c1 + c2 + c3
+                    GL.vertex_colors = triangle_colors
                 else:
                     triangle_colors = colors["emissiveColor"] * 3
 
-                GL.triangleSet(triangle_points, colors, vertex_colors=triangle_colors)
+                GL.triangleSet(triangle_points, colors)
 
         i += 1
             
