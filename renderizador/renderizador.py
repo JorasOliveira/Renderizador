@@ -19,7 +19,7 @@ import gpu          # Simula os recursos de uma GPU
 
 import x3d          # Faz a leitura do arquivo X3D, gera o grafo de cena e faz traversal
 import scenegraph   # Imprime o grafo de cena no console
-
+import numpy as np
 LARGURA = 60  # Valor padrão para largura da tela
 ALTURA = 40   # Valor padrão para altura da tela
 
@@ -41,13 +41,14 @@ class Renderizador:
         # Configurando color buffers para exibição na tela
 
         # Cria uma (1) posição de FrameBuffer na GPU
-        fbo = gpu.GPU.gen_framebuffers(1)
+        fbo = gpu.GPU.gen_framebuffers(3)
 
         # Define o atributo FRONT como o FrameBuffe principal
-        self.framebuffers["FRONT"] = fbo[0]
+        self.framebuffers["SSAA"] = fbo[0]
+        self.framebuffers["FRONT"] = fbo[1]
 
         # Define que a posição criada será usada para desenho e leitura
-        gpu.GPU.bind_framebuffer(gpu.GPU.FRAMEBUFFER, self.framebuffers["FRONT"])
+        gpu.GPU.bind_framebuffer(gpu.GPU.FRAMEBUFFER, self.framebuffers["SSAA"])
         # Opções:
         # - DRAW_FRAMEBUFFER: Faz o bind só para escrever no framebuffer
         # - READ_FRAMEBUFFER: Faz o bind só para leitura no framebuffer
@@ -56,6 +57,15 @@ class Renderizador:
         # Aloca memória no FrameBuffer para um tipo e tamanho especificado de buffer
 
         # Memória de Framebuffer para canal de cores
+        # SSAA 2x
+        gpu.GPU.framebuffer_storage(
+            self.framebuffers["SSAA"],
+            gpu.GPU.COLOR_ATTACHMENT,
+            gpu.GPU.RGB8,
+            self.width * 2,
+            self.height * 2
+        )
+
         gpu.GPU.framebuffer_storage(
             self.framebuffers["FRONT"],
             gpu.GPU.COLOR_ATTACHMENT,
@@ -100,6 +110,7 @@ class Renderizador:
 
         # Limpa o frame buffers atual
         gpu.GPU.clear_buffer()
+        
 
         # Recursos que podem ser úteis:
         # Define o valor do pixel no framebuffer: draw_pixel(coord, mode, data)
@@ -109,8 +120,27 @@ class Renderizador:
         """Rotinas pós renderização."""
         # Função invocada após o processo de renderização terminar.
 
+        buffer = gpu.GPU.get_frame_buffer()
+        height, width, channels = buffer.shape
+        gpu.GPU.bind_framebuffer(gpu.GPU.FRAMEBUFFER, self.framebuffers["FRONT"])
+        downsampled = np.zeros((height//2, width//2, channels), dtype=buffer.dtype)
+        # 2X Downsampling
+        for y in range(0, height, 2):
+            for x in range(0, width, 2):
+                block = buffer[y:y+2, x:x+2]
+                avg_color = np.mean(block, axis=(0,1))
+                downsampled[y//2, x//2] = avg_color
+
+        # Write the downsampled buffer to the front framebuffer
+        print(f"SSAA buffer shape: {buffer.shape}")
+        print(f"Downsampled shape: {downsampled.shape}")
+        for y in range(downsampled.shape[0]):
+            for x in range(downsampled.shape[1]):
+                gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, downsampled[y, x])
+
+
         # Método para a troca dos buffers (NÃO IMPLEMENTADO)
-        gpu.GPU.swap_buffers()
+        # gpu.GPU.swap_buffers()
 
     def mapping(self):
         """Mapeamento de funções para as rotinas de renderização."""

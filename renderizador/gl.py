@@ -15,13 +15,13 @@ import time         # Para operações com tempo
 import gpu          # Simula os recursos de uma GPU
 import math         # Funções matemáticas
 import numpy as np  # Biblioteca do Numpy
-from typing import Tuple, List, Dict, Optional # type hinting
+from typing import Tuple, List, Dict, Optional
 
 class GL:
     """Classe que representa a biblioteca gráfica (Graphics Library)."""
 
-    width = 800   # largura da tela
-    height = 600  # altura da tela
+    width = 800 * 2  # largura da tela
+    height = 600 * 2 # altura da tela
     near = 0.01   # plano de corte próximo
     far = 1000    # plano de corte distante
 
@@ -225,13 +225,11 @@ class GL:
 
         for i in range(0, len(vertices), 6):
             #all vertices are saved as points
-            x_0, y_0 = int(vertices[0]), int(vertices[1])
-            x_1, y_1 = int(vertices[2]), int(vertices[3])
-            x_2, y_2 = int(vertices[4]), int(vertices[5])
+            x_0, y_0 = int(vertices[0]) * 2, int(vertices[1]) * 2
+            x_1, y_1 = int(vertices[2]) * 2, int(vertices[3]) * 2
+            x_2, y_2 = int(vertices[4]) * 2, int(vertices[5]) * 2
 
             # figuring out if a point is withing a triangle or not
-            # L(x, y) = x(y1 – y0) – y(x1 – x0) + y0(x1 – x0) – x0(y1 – y0)
-            # if (L1 >= 0 && L2 >= 0 && L3 >= 0) p is inside the triangle 
             # with bounding box optmization
 
             # Check if the triangle is completely outside the screen
@@ -345,8 +343,8 @@ class GL:
             render_points = projection_matrix[:2, :].flatten(order='F')
             render_points = render_points.tolist()
 
-
-            GL.triangleSet2D(render_points, colors)
+            GL.triangleSet2D(render_points, colors
+                             )
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
         """Função usada para renderizar (na verdade coletar os dados) de Viewpoint."""
@@ -560,19 +558,19 @@ class GL:
         # implementadado um método para a leitura de imagens.
 
         # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("IndexedFaceSet : ")
-        # if coord:
-        #     print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
-        # print("colorPerVertex = {0}".format(colorPerVertex))
-        # if colorPerVertex and color and colorIndex:
-        #     print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
-        # if texCoord and texCoordIndex:
-        #     print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
-        # if current_texture:
-        #     image = gpu.GPU.load_texture(current_texture[0])
-        #     print("\t Matriz com image = {0}".format(image))
-        #     print("\t Dimensões da image = {0}".format(image.shape))
-        # print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
+        print("IndexedFaceSet : ")
+        if coord:
+            print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
+        print("colorPerVertex = {0}".format(colorPerVertex))
+        if colorPerVertex and color and colorIndex:
+            print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
+        if texCoord and texCoordIndex:
+            print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
+        if current_texture:
+            image = gpu.GPU.load_texture(current_texture[0])
+            print("\t Matriz com image = {0}".format(image))
+            print("\t Dimensões da image = {0}".format(image.shape))
+        print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
         
         #creagin a list of vertices and colors
         vertices = {}
@@ -583,7 +581,11 @@ class GL:
         if colorPerVertex and color:
             for i in range(0, len(color), 3):
                 vertex_colors[i // 3] = (color[i:i+3])
-                # GL.vertex_colors = vertex_colors
+
+        tex_coords = {}
+        if texCoord and texCoordIndex:
+            for i in range(0, len(texCoord), 3):
+                tex_coords[i // 3] = texCoord[i:i+3]
 
         #calculating the triangles 
         i = 0
@@ -596,6 +598,9 @@ class GL:
             while i < len(coordIndex) and coordIndex[i] != -1:
                 face_indices.append(coordIndex[i])
                 i += 1
+            print("face_indices: ", face_indices, '\n')
+            # print("coord_index: ", coordIndex, '\n')
+            print("text_coords: ", tex_coords, '\n')
 
             for j in range(1, len(face_indices) - 1):
                 idx1, idx2, idx3 = face_indices[0], face_indices[j], face_indices[j + 1]
