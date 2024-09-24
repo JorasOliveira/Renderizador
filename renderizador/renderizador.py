@@ -62,8 +62,8 @@ class Renderizador:
             self.framebuffers["SSAA"],
             gpu.GPU.COLOR_ATTACHMENT,
             gpu.GPU.RGB8,
-            self.width * 2,
-            self.height * 2
+            self.width *2,
+            self.height *2
         )
 
         gpu.GPU.framebuffer_storage(
@@ -119,24 +119,15 @@ class Renderizador:
     def pos(self):
         """Rotinas pós renderização."""
         # Função invocada após o processo de renderização terminar.
-
         buffer = gpu.GPU.get_frame_buffer()
-        height, width, channels = buffer.shape
         gpu.GPU.bind_framebuffer(gpu.GPU.FRAMEBUFFER, self.framebuffers["FRONT"])
-        downsampled = np.zeros((height//2, width//2, channels), dtype=buffer.dtype)
         # 2X Downsampling
-        for y in range(0, height, 2):
-            for x in range(0, width, 2):
+        for y in range(0, buffer.shape[0],2):
+            for x in range(0, buffer.shape[1],2):
                 block = buffer[y:y+2, x:x+2]
                 avg_color = np.mean(block, axis=(0,1))
-                downsampled[y//2, x//2] = avg_color
+                gpu.GPU.draw_pixel([x//2, y//2], gpu.GPU.RGB8, avg_color)
 
-        # Write the downsampled buffer to the front framebuffer
-        print(f"SSAA buffer shape: {buffer.shape}")
-        print(f"Downsampled shape: {downsampled.shape}")
-        for y in range(downsampled.shape[0]):
-            for x in range(downsampled.shape[1]):
-                gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, downsampled[y, x])
 
 
         # Método para a troca dos buffers (NÃO IMPLEMENTADO)

@@ -20,16 +20,16 @@ from typing import Tuple, List, Dict, Optional
 class GL:
     """Classe que representa a biblioteca gráfica (Graphics Library)."""
 
-    width = 800 * 2  # largura da tela
-    height = 600 * 2 # altura da tela
+    width = 800  # largura da tela
+    height = 600  # altura da tela
     near = 0.01   # plano de corte próximo
     far = 1000    # plano de corte distante
 
     @staticmethod
     def setup(width, height, near=0.01, far=1000):
         """Definr parametros para câmera de razão de aspecto, plano próximo e distante."""
-        GL.width = width
-        GL.height = height
+        GL.width = width * 2
+        GL.height = height * 2
         GL.near = near
         GL.far = far
         GL.view_matrix = np.identity(4)
@@ -38,6 +38,7 @@ class GL:
         GL.perspective_matrix = np.identity(4)
         GL.vertex_colors = None
         GL.w_values = None
+        GL.three_d_call = 0
 
     @staticmethod
     def barycentric_coordinates(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> Tuple[float, float, float]:
@@ -225,9 +226,14 @@ class GL:
 
         for i in range(0, len(vertices), 6):
             #all vertices are saved as points
-            x_0, y_0 = int(vertices[0]) * 2, int(vertices[1]) * 2
-            x_1, y_1 = int(vertices[2]) * 2, int(vertices[3]) * 2
-            x_2, y_2 = int(vertices[4]) * 2, int(vertices[5]) * 2
+            if GL.three_d_call:
+                x_0, y_0 = int(vertices[0]), int(vertices[1])
+                x_1, y_1 = int(vertices[2]), int(vertices[3])
+                x_2, y_2 = int(vertices[4]), int(vertices[5])
+            else: 
+                x_0, y_0 = int(vertices[0]) * 2, int(vertices[1]) * 2
+                x_1, y_1 = int(vertices[2]) * 2, int(vertices[3]) * 2
+                x_2, y_2 = int(vertices[4]) * 2, int(vertices[5]) * 2
 
             # figuring out if a point is withing a triangle or not
             # with bounding box optmization
@@ -303,7 +309,7 @@ class GL:
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         # print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         # print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
-       
+        GL.three_d_call = 1
         for i in range(0, len(point) - 8, 9):
             # coordiantes array, format is rows contain  x, y, z, w values
             points = np.array([
@@ -343,8 +349,7 @@ class GL:
             render_points = projection_matrix[:2, :].flatten(order='F')
             render_points = render_points.tolist()
 
-            GL.triangleSet2D(render_points, colors
-                             )
+            GL.triangleSet2D(render_points, colors)
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
         """Função usada para renderizar (na verdade coletar os dados) de Viewpoint."""
