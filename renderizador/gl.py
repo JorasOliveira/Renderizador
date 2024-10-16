@@ -227,9 +227,10 @@ class GL:
         for i in range(0, len(vertices), 6):
             #all vertices are saved as points
             if GL.three_d_call:
-                x_0, y_0 = int(vertices[0]), int(vertices[1])
-                x_1, y_1 = int(vertices[2]), int(vertices[3])
-                x_2, y_2 = int(vertices[4]), int(vertices[5])
+                vertices_2d = vertices[:2, :].flatten(order='F')
+                x_0, y_0 = int(vertices_2d[0]), int(vertices_2d[1])
+                x_1, y_1 = int(vertices_2d[2]), int(vertices_2d[3])
+                x_2, y_2 = int(vertices_2d[4]), int(vertices_2d[5])
             else: 
                 x_0, y_0 = int(vertices[0]) * 2, int(vertices[1]) * 2
                 x_1, y_1 = int(vertices[2]) * 2, int(vertices[3]) * 2
@@ -253,6 +254,7 @@ class GL:
             v2 = np.array([x_1, y_1])
             v3 = np.array([x_2, y_2])
 
+            # colors for each vertex
             if GL.vertex_colors is not None:
                 c1 = np.array(GL.vertex_colors[0:3])
                 c2 = np.array(GL.vertex_colors[3:6])
@@ -264,26 +266,54 @@ class GL:
             if GL.w_values is not None:
                 w1, w2, w3 = 1/GL.w_values[0], 1/GL.w_values[1], 1/GL.w_values[2]
             else:
-                w1 = w2 = w3 = 1.0  
+                w1 = w2 = w3 = 1.0
 
+            # draws the triangle on the screen and fills it with the color/gradient/texure
+            #TODO-> implement texture mapping
             for x in range(x_min, x_max + 1):
                 for y in range(y_min, y_max + 1):
                     p = np.array([x, y])
                     u, v, w = GL.barycentric_coordinates(p, v1, v2, v3)
-                    u, v, w = round(u, 15), round(v, 15), round(w, 15)
                     
-                    epsilon = -1e-6
+                    epsilon = -1e-8 # avoids weird artifacts on edges that show up sometimes
                     if u >= epsilon and v >= epsilon and w >= epsilon:
                         # Perspective-correct interpolation
                         z = 1 / (u * w1 + v * w2 + w * w3)
-                        u_corrected = u * w1 * z
-                        v_corrected = v * w2 * z
-                        w_corrected = w * w3 * z
+                        
+                        # z*=-1
+                        z_buffer = int(gpu.GPU.read_pixel([x, y], gpu.GPU.DEPTH_COMPONENT32F))
+                        # print("z: ", z)
+                        # print("z_buffer: ", z_buffer)
 
-                        color = u_corrected * c1 + v_corrected * c2 + w_corrected * c3
-                        r, g, b = [int(max(0, min(255, c * 255))) for c in color]
+                        # inverted check, works for some reason.
+                        if z > z_buffer :
+                            # continue
 
-                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
+                            u_corrected = u * w1 * z
+                            v_corrected = v * w2 * z
+                            w_corrected = w * w3 * z
+
+                            color = u_corrected * c1 + v_corrected * c2 + w_corrected * c3
+                            r, g, b = [int(max(0, min(255, c * 255))) for c in color]
+
+                            transparency = colors["transparency"]
+                            # print("transparency: ", transparency)
+
+                            if (transparency > 0):
+                                z_buffer *= transparency 
+
+                                r_new = r * (1 - transparency)
+                                r = int(r_new + z_buffer)
+
+                                g_new = g * (1 - transparency)
+                                g = int(g_new + z_buffer)
+
+                                b_new = b * (1 - transparency)
+                                b = int(b_new + z_buffer)
+
+                            # gpu.GPU.bind_framebuffer(gpu.GPU.FRAMEBUFFER, gpu.GPU.frame_buffer .framebuffers["FRONT"])
+                            gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
+                            gpu.GPU.draw_pixel([x, y], gpu.GPU.DEPTH_COMPONENT32F, [z])
 
         # Exemplo:
         # GL.polypoint2D(vertices, colors)
@@ -339,17 +369,15 @@ class GL:
             # Mapping from camera space to screen space
             screen_transform = np.array([
                 [GL.width / 2, 0, 0, GL.width / 2],
-                [0, -GL.height / 2, 0, GL.height / 2],
+                [0, GL.height / 2, 0, GL.height / 2],
                 [0, 0, 1, 0],
                 [0, 0, 0, 1]
             ])
             projection_matrix = screen_transform @ ndc_projection
+        
+            GL.triangleSet2D(projection_matrix, colors)
 
-            # Flatten to get the final render points (x, y coordinates)
-            render_points = projection_matrix[:2, :].flatten(order='F')
-            render_points = render_points.tolist()
 
-            GL.triangleSet2D(render_points, colors)
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
         """Função usada para renderizar (na verdade coletar os dados) de Viewpoint."""
@@ -366,7 +394,7 @@ class GL:
             [0, 0, 0, 1]
         ])
 
-        # look at represnetes the camera orientation in relation to the world
+        # look at represents the camera orientation in relation to the world
         # view matrix represents the world orientation in relation to the camera
         look_at = np.linalg.inv(translation_matrix) @ np.linalg.inv(rotation_matrix)
         GL.view_matrix = np.linalg.inv(look_at)
@@ -382,7 +410,7 @@ class GL:
         # Perspective matrix
         perspective_matrix = np.array([
             [(GL.near / right), 0, 0, 0],
-            [0, (GL.near / top), 0, 0],
+            [0, -(GL.near / top), 0, 0],
             [0, 0, -((GL.far + GL.near) / (GL.far - GL.near)), -((2 * GL.far * GL.near) / (GL.far - GL.near))],
             [0, 0, -1, 0]
         ])
@@ -562,21 +590,7 @@ class GL:
         # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
         # implementadado um método para a leitura de imagens.
 
-        # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("IndexedFaceSet : ")
-        if coord:
-            print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
-        print("colorPerVertex = {0}".format(colorPerVertex))
-        if colorPerVertex and color and colorIndex:
-            print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
-        if texCoord and texCoordIndex:
-            print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
-        if current_texture:
-            image = gpu.GPU.load_texture(current_texture[0])
-            print("\t Matriz com image = {0}".format(image))
-            print("\t Dimensões da image = {0}".format(image.shape))
-        print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
-        
+
         #creagin a list of vertices and colors
         vertices = {}
         for i in range(0, len(coord), 3):
@@ -603,10 +617,7 @@ class GL:
             while i < len(coordIndex) and coordIndex[i] != -1:
                 face_indices.append(coordIndex[i])
                 i += 1
-            print("face_indices: ", face_indices, '\n')
-            # print("coord_index: ", coordIndex, '\n')
-            print("text_coords: ", tex_coords, '\n')
-
+ 
             for j in range(1, len(face_indices) - 1):
                 idx1, idx2, idx3 = face_indices[0], face_indices[j], face_indices[j + 1]
                 v1, v2, v3 = vertices[idx1], vertices[idx2], vertices[idx3]

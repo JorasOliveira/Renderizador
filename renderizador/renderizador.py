@@ -19,7 +19,9 @@ import gpu          # Simula os recursos de uma GPU
 
 import x3d          # Faz a leitura do arquivo X3D, gera o grafo de cena e faz traversal
 import scenegraph   # Imprime o grafo de cena no console
+
 import numpy as np
+import math
 LARGURA = 60  # Valor padrão para largura da tela
 ALTURA = 40   # Valor padrão para altura da tela
 
@@ -75,13 +77,18 @@ class Renderizador:
         )
 
         # Descomente as seguintes linhas se for usar um Framebuffer para profundidade
-        # gpu.GPU.framebuffer_storage(
-        #     self.framebuffers["FRONT"],
-        #     gpu.GPU.DEPTH_ATTACHMENT,
-        #     gpu.GPU.DEPTH_COMPONENT32F,
-        #     self.width,
-        #     self.height
-        # )
+        gpu.GPU.framebuffer_storage(
+            self.framebuffers["SSAA"],
+            gpu.GPU.DEPTH_ATTACHMENT,
+            gpu.GPU.DEPTH_COMPONENT32F,
+            self.width*2,
+            self.height*2
+        )
+        # fillin depth buffer with inf
+        for i in range(self.width *2):
+            for j in range(self.height *2):
+                gpu.GPU.draw_pixel([i, j], gpu.GPU.DEPTH_COMPONENT32F, [math.inf])
+
     
         # Opções:
         # - COLOR_ATTACHMENT: alocações para as cores da imagem renderizada
