@@ -90,6 +90,15 @@ class GL:
             [0, 0, 0, 1]
         ]) 
         return rotation_matrix
+    @staticmethod
+    def is_inside_triangle(x_0, y_0, x_1, y_1, x_2, y_2, x, y):
+        l_1 = x * (y_1 - y_0) - y * (x_1 - x_0) + y_0 * (x_1 - x_0) - x_0 * (y_1 - y_0)
+        l_2 = x * (y_2 - y_1) - y * (x_2 - x_1) + y_1 * (x_2 - x_1) - x_1 * (y_2 - y_1)
+        l_3 = x * (y_0 - y_2) - y * (x_0 - x_2) + y_2 * (x_0 - x_2) - x_2 * (y_0 - y_2)
+
+        return (l_1 >= 0) and (l_2 >= 0) and (l_3 >= 0)
+
+
 
     @staticmethod
     def polypoint2D(point, colors):
@@ -231,6 +240,7 @@ class GL:
                 x_0, y_0 = int(vertices_2d[0]), int(vertices_2d[1])
                 x_1, y_1 = int(vertices_2d[2]), int(vertices_2d[3])
                 x_2, y_2 = int(vertices_2d[4]), int(vertices_2d[5])
+                z0, z1, z2 = vertices[2]
             else: 
                 x_0, y_0 = int(vertices[0]) * 2, int(vertices[1]) * 2
                 x_1, y_1 = int(vertices[2]) * 2, int(vertices[3]) * 2
@@ -269,52 +279,47 @@ class GL:
                 w1 = w2 = w3 = 1.0
 
             # draws the triangle on the screen and fills it with the color/gradient/texure
-            #TODO-> implement texture mapping
             for x in range(x_min, x_max + 1):
                 for y in range(y_min, y_max + 1):
                     p = np.array([x, y])
-                    u, v, w = GL.barycentric_coordinates(p, v1, v2, v3)
-                    
-                    epsilon = -1e-8 # avoids weird artifacts on edges that show up sometimes
-                    if u >= epsilon and v >= epsilon and w >= epsilon:
-                        # Perspective-correct interpolation
-                        z = 1 / (u * w1 + v * w2 + w * w3)
-                        
-                        # z*=-1
+                    is_inside = GL.is_inside_triangle(x_0, y_0, x_1, y_1, x_2, y_2, x, y)
+                    if is_inside:
+                        u, v, w = GL.barycentric_coordinates(p, v1, v2, v3)
+                        z = (u * z0 + v * z1 + w * z2)  / ( ( u*(1/z0) + v*(1/z1) + w*(1/z2) ) )
                         z_buffer = int(gpu.GPU.read_pixel([x, y], gpu.GPU.DEPTH_COMPONENT32F))
-                        # print("z: ", z)
-                        # print("z_buffer: ", z_buffer)
 
-                        # inverted check, works for some reason.
-                        if z > z_buffer :
-                            # continue
-
-                            u_corrected = u * w1 * z
-                            v_corrected = v * w2 * z
-                            w_corrected = w * w3 * z
+                        if z < z_buffer:
+                            # Perspective-correct interpolation
+                            u_corrected = (u * w1) / (u * w1 + v * w2 + w * w3)
+                            v_corrected = (v * w2) / (u * w1 + v * w2 + w * w3)
+                            w_corrected = (w * w3) / (u * w1 + v * w2 + w * w3)
 
                             color = u_corrected * c1 + v_corrected * c2 + w_corrected * c3
                             r, g, b = [int(max(0, min(255, c * 255))) for c in color]
 
                             transparency = colors["transparency"]
-                            # print("transparency: ", transparency)
 
                             if (transparency > 0):
-                                z_buffer *= transparency 
+                                frame_buffer = gpu.GPU.read_pixel([x, y], gpu.GPU.RGB8)
+                                # print("frame_buffer:", frame_buffer)
 
+                                old_r = frame_buffer[0]
+                                old_g = frame_buffer[1]
+                                old_b = frame_buffer[2] 
+                                # Directly multiply and check values
+                                r_mult = old_r * transparency
+                                g_mult = old_g * transparency
+                                b_mult = old_b * transparency
                                 r_new = r * (1 - transparency)
-                                r = int(r_new + z_buffer)
-
                                 g_new = g * (1 - transparency)
-                                g = int(g_new + z_buffer)
-
                                 b_new = b * (1 - transparency)
-                                b = int(b_new + z_buffer)
+                                r = int(r_new + r_mult)
+                                g = int(g_new + g_mult)
+                                b = int(b_new + b_mult)
 
-                            # gpu.GPU.bind_framebuffer(gpu.GPU.FRAMEBUFFER, gpu.GPU.frame_buffer .framebuffers["FRONT"])
-                            gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
                             gpu.GPU.draw_pixel([x, y], gpu.GPU.DEPTH_COMPONENT32F, [z])
-
+                            gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
+                            
         # Exemplo:
         # GL.polypoint2D(vertices, colors)
 
@@ -633,7 +638,7 @@ class GL:
 
                 GL.triangleSet(triangle_points, colors)
 
-        i += 1
+            i += 1
             
 
 

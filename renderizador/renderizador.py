@@ -84,10 +84,10 @@ class Renderizador:
             self.width*2,
             self.height*2
         )
-        # fillin depth buffer with inf
-        for i in range(self.width *2):
-            for j in range(self.height *2):
-                gpu.GPU.draw_pixel([i, j], gpu.GPU.DEPTH_COMPONENT32F, [math.inf])
+        # # fillin depth buffer with inf
+        # for i in range(self.width *2):
+        #     for j in range(self.height *2):
+        #         gpu.GPU.draw_pixel([i, j], gpu.GPU.DEPTH_COMPONENT32F, [math.inf])
 
     
         # Opções:
