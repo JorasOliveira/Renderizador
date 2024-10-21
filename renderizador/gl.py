@@ -247,8 +247,6 @@ class GL:
                 x_2, y_2 = int(vertices[4]) * 2, int(vertices[5]) * 2
 
             # figuring out if a point is withing a triangle or not
-            # with bounding box optmization
-
             # Check if the triangle is completely outside the screen
             if (max(x_0, x_1, x_2) < 0 or min(x_0, x_1, x_2) >= GL.width or
                 max(y_0, y_1, y_2) < 0 or min(y_0, y_1, y_2) >= GL.height):
@@ -260,6 +258,7 @@ class GL:
             y_min = max(min(y_0, y_1, y_2), 0)
             y_max = min(max(y_0, y_1, y_2), GL.height - 1)
 
+            # vertexes for calculations later
             v1 = np.array([x_0, y_0])
             v2 = np.array([x_1, y_1])
             v3 = np.array([x_2, y_2])
@@ -284,42 +283,35 @@ class GL:
                     p = np.array([x, y])
                     is_inside = GL.is_inside_triangle(x_0, y_0, x_1, y_1, x_2, y_2, x, y)
                     if is_inside:
+                        # uvw values for perspective correction
                         u, v, w = GL.barycentric_coordinates(p, v1, v2, v3)
-                        z = (u * z0 + v * z1 + w * z2)  / ( ( u*(1/z0) + v*(1/z1) + w*(1/z2) ) )
-                        z_buffer = int(gpu.GPU.read_pixel([x, y], gpu.GPU.DEPTH_COMPONENT32F))
-
+                        
+                        # Zbuffer calculation
+                        if GL.three_d_call:
+                            z = (u * z0 + v * z1 + w * z2)  / ( ( u*(1/z0) + v*(1/z1) + w*(1/z2) ) ) 
+                        else: z = 0
+                        z_buffer = float(gpu.GPU.read_pixel([x, y], gpu.GPU.DEPTH_COMPONENT32F))
+                        # drawing only the pixels closer to the camera
                         if z < z_buffer:
+                            gpu.GPU.draw_pixel([x, y], gpu.GPU.DEPTH_COMPONENT32F, [z])
                             # Perspective-correct interpolation
                             u_corrected = (u * w1) / (u * w1 + v * w2 + w * w3)
                             v_corrected = (v * w2) / (u * w1 + v * w2 + w * w3)
                             w_corrected = (w * w3) / (u * w1 + v * w2 + w * w3)
-
                             color = u_corrected * c1 + v_corrected * c2 + w_corrected * c3
                             r, g, b = [int(max(0, min(255, c * 255))) for c in color]
 
                             transparency = colors["transparency"]
-
-                            if (transparency > 0):
-                                frame_buffer = gpu.GPU.read_pixel([x, y], gpu.GPU.RGB8)
-                                # print("frame_buffer:", frame_buffer)
-
-                                old_r = frame_buffer[0]
-                                old_g = frame_buffer[1]
-                                old_b = frame_buffer[2] 
-                                # Directly multiply and check values
-                                r_mult = old_r * transparency
-                                g_mult = old_g * transparency
-                                b_mult = old_b * transparency
-                                r_new = r * (1 - transparency)
-                                g_new = g * (1 - transparency)
-                                b_new = b * (1 - transparency)
-                                r = int(r_new + r_mult)
-                                g = int(g_new + g_mult)
-                                b = int(b_new + b_mult)
-
-                            gpu.GPU.draw_pixel([x, y], gpu.GPU.DEPTH_COMPONENT32F, [z])
-                            gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
+                            if transparency > 0:
+                                # Read existing frame buffer color
+                                old_r, old_g, old_b = gpu.GPU.read_pixel([x, y], gpu.GPU.RGB8)
+                                # Blend the new color with the existing one based on transparency
+                                r = int(r * (1 - transparency) + (old_r * transparency))
+                                g = int(g * (1 - transparency) + (old_g * transparency))
+                                b = int(b * (1 - transparency) + (old_b * transparency))
                             
+                            gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [r, g, b])
+                        else: continue
         # Exemplo:
         # GL.polypoint2D(vertices, colors)
 

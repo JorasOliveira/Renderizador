@@ -84,12 +84,7 @@ class Renderizador:
             self.width*2,
             self.height*2
         )
-        # # fillin depth buffer with inf
-        # for i in range(self.width *2):
-        #     for j in range(self.height *2):
-        #         gpu.GPU.draw_pixel([i, j], gpu.GPU.DEPTH_COMPONENT32F, [math.inf])
 
-    
         # Opções:
         # - COLOR_ATTACHMENT: alocações para as cores da imagem renderizada
         # - DEPTH_ATTACHMENT: alocações para as profundidades da imagem renderizada
@@ -138,7 +133,7 @@ class Renderizador:
 
 
         # Método para a troca dos buffers (NÃO IMPLEMENTADO)
-        # gpu.GPU.swap_buffers()
+        gpu.GPU.swap_buffers()
 
     def mapping(self):
         """Mapeamento de funções para as rotinas de renderização."""
